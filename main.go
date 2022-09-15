@@ -41,13 +41,15 @@ func deleteDirContents(dirName string) error {
 func main() {
 
 	socketRootDir := "/tmp/firecracker"
+
 	// Create folder if doesn't exist and clean up after everything
 	os.MkdirAll(socketRootDir, fs.ModePerm)
 	defer deleteDirContents(socketRootDir)
 
 	// Generate a socket file name
 	rand.Seed(time.Now().Unix())
-	sockName := strconv.Itoa(rand.Intn(10000000)) + ".sock"
+	id := strconv.Itoa(rand.Intn(10000000))
+	sockName := id + ".sock"
 	log.Println("Using sock", sockName)
 
 	// _, stdout, stderr := getIO()
@@ -55,7 +57,7 @@ func main() {
 	command := fc.VMCommandBuilder{}.
 		WithBin("firecracker").
 		WithSocketPath(path.Join(socketRootDir, sockName)). // should autogenerate and clean up after exit
-		WithArgs([]string{"--config-file", "vm_config.json"}).
+		WithArgs([]string{"--config-file", "vm_config.json", "--id", id}).
 		WithStdin(os.Stdin).
 		WithStdout(os.Stdout).
 		WithStderr(os.Stderr).
