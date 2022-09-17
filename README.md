@@ -13,3 +13,4 @@ Control plane for spinning up Firecracker microVMs
 3. Setup networking for microVM
    1. See https://github.com/firecracker-microvm/firecracker/blob/main/docs/network-setup.md
 4. Look at [firecracker-containerd](https://github.com/firecracker-microvm/firecracker-containerd)
+   1. See how firecracker VMs are created with the same root base image
