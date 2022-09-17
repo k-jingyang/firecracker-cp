@@ -12,3 +12,4 @@ Control plane for spinning up Firecracker microVMs
       1. microVM has to be configured to fetch from MMDS on boot, https://github.com/firecracker-microvm/firecracker/issues/1947
 3. Setup networking for microVM
    1. See https://github.com/firecracker-microvm/firecracker/blob/main/docs/network-setup.md
+4. Look at [firecracker-containerd](https://github.com/firecracker-microvm/firecracker-containerd)
