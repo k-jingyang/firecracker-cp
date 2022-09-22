@@ -1,19 +1,15 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"io"
-	"io/fs"
 	"io/ioutil"
-	"log"
-	"math/rand"
 	"os"
 	"path"
-	"strconv"
-	"time"
+	"syscall"
 
-	fc "github.com/firecracker-microvm/firecracker-go-sdk"
+	"github.com/rs/zerolog/log"
+	"pault.ag/go/loopback"
 )
 
 // stdin, stdout, stderror
@@ -38,40 +34,100 @@ func deleteDirContents(dirName string) error {
 	return nil
 }
 
+// sudo mount rootfs.ext4 /tmp/my-rootfs
+
+// sudo mkdir -p /tmp/my-rootfs/overlay/root \
+//     /tmp/my-rootfs/overlay/work \
+//     /tmp/my-rootfs/mnt/rom
+
+// sudo cp overlay-init /tmp/my-rootfs/sbin/overlay-init
+
+// sudo mksquashfs /tmp/my-rootfs rootfs.img -noappend
+
+// sudo umount /tmp/my-rootfs
+
+// returns the path to the squashfs image
+func buildSquashFSImage(pathToBaseImage string, pathToInitScript string) (string, error) {
+
+	randomDirName, err := os.MkdirTemp("/tmp", "*")
+	if err != nil {
+		log.Error().Msg("Unable to create random folder")
+		return "", err
+	}
+	log.Debug().Msg("Random folder generated=" + randomDirName)
+	defer os.RemoveAll(randomDirName)
+
+	imageFile, err := os.Open(pathToBaseImage)
+	if err != nil {
+		log.Error().Msg("Unable to open " + pathToBaseImage + " for reading")
+		return "", err
+	}
+
+	log.Debug().Msg("Mounting " + pathToBaseImage)
+
+	// It should be possible to read this
+	// Fails if I take away syscall.MS_RDONLY
+	_, unmount, err := loopback.MountImage(imageFile, randomDirName, "ext4", syscall.MS_RDONLY, "")
+	if err != nil {
+		log.Error().Err(err).Msg("Unable to mount")
+		return "", err
+	}
+	defer unmount()
+
+	dirEntries, err := os.ReadDir(randomDirName)
+	if err != nil {
+		log.Error().Msg("Unable to read directory entries")
+		return "", err
+	}
+
+	for _, entry := range dirEntries {
+		fmt.Println(entry.Name())
+	}
+
+	return "test", nil
+
+}
+
 func main() {
 
-	socketRootDir := "/tmp/firecracker"
+	_, err := buildSquashFSImage("./bionic.rootfs.base.ext4", "")
 
-	// Create folder if doesn't exist and clean up after everything
-	os.MkdirAll(socketRootDir, fs.ModePerm)
-	defer deleteDirContents(socketRootDir)
+	if err != nil {
+		log.Error().Err(err).Send()
+	}
 
-	// Generate a socket file name
-	rand.Seed(time.Now().Unix())
-	id := strconv.Itoa(rand.Intn(10000000))
-	sockName := id + ".sock"
-	log.Println("Using sock", sockName)
+	// socketRootDir := "/tmp/firecracker"
 
-	// _, stdout, stderr := getIO()
+	// // Create folder if doesn't exist and clean up after everything
+	// os.MkdirAll(socketRootDir, fs.ModePerm)
+	// defer deleteDirContents(socketRootDir)
 
-	command := fc.VMCommandBuilder{}.
-		WithBin("firecracker").
-		WithSocketPath(path.Join(socketRootDir, sockName)). // should autogenerate and clean up after exit
-		WithArgs([]string{"--config-file", "vm_config.json", "--id", id}).
-		WithStdin(os.Stdin).
-		WithStdout(os.Stdout).
-		WithStderr(os.Stderr).
-		Build(context.Background())
+	// // Generate a socket file name
+	// rand.Seed(time.Now().Unix())
+	// id := strconv.Itoa(rand.Intn(10000000))
+	// sockName := id + ".sock"
+	// log.Println("Using sock", sockName)
 
-	done := make(chan error)
-	go func() {
-		done <- command.Run()
-	}()
+	// // _, stdout, stderr := getIO()
 
-	// How to handle interrupt? i.e. ctrl-c?
+	// command := fc.VMCommandBuilder{}.
+	// 	WithBin("firecracker").
+	// 	WithSocketPath(path.Join(socketRootDir, sockName)). // should autogenerate and clean up after exit
+	// 	WithArgs([]string{"--config-file", "vm_config.json", "--id", id}).
+	// 	WithStdin(os.Stdin).
+	// 	WithStdout(os.Stdout).
+	// 	WithStderr(os.Stderr).
+	// 	Build(context.Background())
 
-	// <-ctx.Done()
-	<-done
-	fmt.Printf("Done..")
+	// done := make(chan error)
+	// go func() {
+	// 	done <- command.Run()
+	// }()
+
+	// // How to handle interrupt? i.e. ctrl-c?
+
+	// // <-ctx.Done()
+	// <-done
+	// fmt.Println("Done..")
 
 }
