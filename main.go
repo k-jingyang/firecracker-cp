@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
-	"syscall"
 
 	"github.com/rs/zerolog/log"
 	"pault.ag/go/loopback"
@@ -34,19 +33,6 @@ func deleteDirContents(dirName string) error {
 	return nil
 }
 
-// sudo mount rootfs.ext4 /tmp/my-rootfs
-
-// sudo mkdir -p /tmp/my-rootfs/overlay/root \
-//     /tmp/my-rootfs/overlay/work \
-//     /tmp/my-rootfs/mnt/rom
-
-// sudo cp overlay-init /tmp/my-rootfs/sbin/overlay-init
-
-// sudo mksquashfs /tmp/my-rootfs rootfs.img -noappend
-
-// sudo umount /tmp/my-rootfs
-
-// returns the path to the squashfs image
 func buildSquashFSImage(pathToBaseImage string, pathToInitScript string) (string, error) {
 
 	randomDirName, err := os.MkdirTemp("/tmp", "*")
@@ -57,7 +43,7 @@ func buildSquashFSImage(pathToBaseImage string, pathToInitScript string) (string
 	log.Debug().Msg("Random folder generated=" + randomDirName)
 	defer os.RemoveAll(randomDirName)
 
-	imageFile, err := os.Open(pathToBaseImage)
+	imageFile, err := os.OpenFile(pathToBaseImage, os.O_RDWR, 0644)
 	if err != nil {
 		log.Error().Msg("Unable to open " + pathToBaseImage + " for reading")
 		return "", err
@@ -67,11 +53,12 @@ func buildSquashFSImage(pathToBaseImage string, pathToInitScript string) (string
 
 	// It should be possible to read this
 	// Fails if I take away syscall.MS_RDONLY
-	_, unmount, err := loopback.MountImage(imageFile, randomDirName, "ext4", syscall.MS_RDONLY, "")
+	_, unmount, err := loopback.MountImage(imageFile, randomDirName, "ext4", 0, "")
 	if err != nil {
 		log.Error().Err(err).Msg("Unable to mount")
 		return "", err
 	}
+
 	defer unmount()
 
 	dirEntries, err := os.ReadDir(randomDirName)
