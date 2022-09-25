@@ -1,6 +1,7 @@
 ## Resolving image mounting issue
 
 1. Troubleshoot using `strace`
+1. Code changes
 
 ```go
 func mountImage(pathToBaseImage string) {
