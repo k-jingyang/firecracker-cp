@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/rs/zerolog v1.28.0
-	pault.ag/go/loopback v0.1.3
+	pault.ag/go/loopback v0.1.4
 )
 
 require (

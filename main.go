@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 
 	"github.com/rs/zerolog/log"
 	"pault.ag/go/loopback"
@@ -33,35 +34,62 @@ func deleteDirContents(dirName string) error {
 	return nil
 }
 
+/*
+buildSquashFSImage's logic, based off https://github.com/firecracker-microvm/firecracker/discussions/3061
+1. Mount base image
+2. Create directories in image to be used for overlay (https://windsock.io/the-overlay-filesystem/)
+  i. 	/overlay/work - scratch space
+  ii. 	/overlay/root - upperdir that provides the writeable layer
+  iii.	/mnt - the new root
+  iv. 	/mnt/rom - the old root
+3. Copy overlay_init into /sbin/overlay-init
+3. Make squashfs
+
+Returns filepath to squashfs image
+*/
 func buildSquashFSImage(pathToBaseImage string, pathToInitScript string) (string, error) {
 
-	randomDirName, err := os.MkdirTemp("/tmp", "*")
+	mountDir, cleanUp, err := mountImageToRandomDir(pathToBaseImage)
 	if err != nil {
-		log.Error().Msg("Unable to create random folder")
 		return "", err
 	}
-	log.Debug().Msg("Random folder generated=" + randomDirName)
-	defer os.RemoveAll(randomDirName)
+	defer cleanUp()
 
-	imageFile, err := os.OpenFile(pathToBaseImage, os.O_RDWR, 0644)
+	// Create directories that will be used later for overlay
+	os.MkdirAll(filepath.Join(mountDir, "overlay", "work"), 755)
+	os.MkdirAll(filepath.Join(mountDir, "overlay", "root"), 755)
+	os.MkdirAll(filepath.Join(mountDir, "mnt", "rom"), 755)
+
+	dirEntries, err := os.ReadDir(filepath.Join(mountDir, "sbin"))
 	if err != nil {
-		log.Error().Msg("Unable to open " + pathToBaseImage + " for reading")
-		return "", err
-	}
-
-	log.Debug().Msg("Mounting " + pathToBaseImage)
-
-	// It should be possible to read this
-	// Fails if I take away syscall.MS_RDONLY
-	_, unmount, err := loopback.MountImage(imageFile, randomDirName, "ext4", 0, "")
-	if err != nil {
-		log.Error().Err(err).Msg("Unable to mount")
+		log.Error().Msg("Unable to read directory entries")
 		return "", err
 	}
 
-	defer unmount()
+	for _, entry := range dirEntries {
+		fmt.Println(entry.Name())
+	}
 
-	dirEntries, err := os.ReadDir(randomDirName)
+	// Copy overlay_init
+	destination, err := os.Create(filepath.Join(mountDir, "sbin", "overlay-init"))
+	if err != nil {
+		return "", err
+	}
+
+	overlay_init, err := os.ReadFile(filepath.Join(".", "overlay_init"))
+	if err != nil {
+		return "", err
+	}
+
+	_, err = destination.Write(overlay_init)
+	if err != nil {
+		return "", err
+	}
+
+	// TODO: Add squashfs implementation
+
+	// List directories
+	dirEntries, err = os.ReadDir(filepath.Join(mountDir, "sbin"))
 	if err != nil {
 		log.Error().Msg("Unable to read directory entries")
 		return "", err
@@ -73,6 +101,38 @@ func buildSquashFSImage(pathToBaseImage string, pathToInitScript string) (string
 
 	return "test", nil
 
+}
+
+// mountImageToRandomDir returns the mountpoint
+func mountImageToRandomDir(pathToBaseImage string) (string, func(), error) {
+	randomDirName, err := os.MkdirTemp("/tmp", "*")
+	if err != nil {
+		log.Error().Msg("Unable to create random folder")
+		return "", func() {}, err
+	}
+	log.Debug().Msg("Random folder generated=" + randomDirName)
+
+	// Must open as RDWR
+	imageFile, err := os.OpenFile(pathToBaseImage, os.O_RDWR, 0)
+	if err != nil {
+		log.Error().Msg("Unable to open " + pathToBaseImage + " for reading")
+		return "", func() {}, err
+	}
+
+	log.Debug().Msg("Mounting " + pathToBaseImage)
+
+	_, unmount, err := loopback.MountImage(imageFile, randomDirName, "ext4", 0, "")
+	if err != nil {
+		log.Error().Err(err).Msg("Unable to mount")
+		return "", func() {}, err
+	}
+
+	cleanUp := func() {
+		unmount()
+		os.RemoveAll(randomDirName)
+	}
+
+	return randomDirName, cleanUp, nil
 }
 
 func main() {

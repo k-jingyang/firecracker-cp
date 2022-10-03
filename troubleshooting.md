@@ -31,3 +31,4 @@ func NextLoopDevice() (*os.File, error) {
 1. Loopback device must be RW
 2. Image must open as RW
 3. What is `FileMode`?
+  - `FileMode` only applicable when creating new files
