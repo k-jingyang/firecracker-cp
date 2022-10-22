@@ -75,6 +75,7 @@ func buildSquashFSImage(pathToBaseImage string, pathToInitScript string) (string
 	if err != nil {
 		return "", err
 	}
+	defer destination.Close()
 
 	overlay_init, err := os.ReadFile(filepath.Join(".", "overlay_init"))
 	if err != nil {
@@ -134,11 +135,9 @@ func mountImageToRandomDir(pathToBaseImage string) (string, func(), error) {
 
 	cleanUp := func() {
 		log.Debug().Msg("Cleaning up...")
-		// syscall.Unmount(randomDirName, 0)
 		imageFile.Close()
 		unmount()
-		// umount2("/tmp/914241525", 0)            = -1 EBUSY (Device or resource busy)
-		// os.RemoveAll(randomDirName)
+		os.RemoveAll(randomDirName)
 	}
 
 	return randomDirName, cleanUp, nil
