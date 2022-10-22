@@ -60,7 +60,7 @@ func buildSquashFSImage(pathToBaseImage string, pathToInitScript string) (string
 	os.MkdirAll(filepath.Join(mountDir, "overlay", "root"), 755)
 	os.MkdirAll(filepath.Join(mountDir, "mnt", "rom"), 755)
 
-	dirEntries, err := os.ReadDir(filepath.Join(mountDir, "sbin"))
+	dirEntries, err := os.ReadDir(filepath.Join(mountDir))
 	if err != nil {
 		log.Error().Msg("Unable to read directory entries")
 		return "", err
@@ -86,10 +86,15 @@ func buildSquashFSImage(pathToBaseImage string, pathToInitScript string) (string
 		return "", err
 	}
 
-	// TODO: Add squashfs implementation
+	// mksquashfs := exec.Command("mksquashfs", mountDir, "new-rootfs.img", "-noappend")
+	// err = mksquashfs.Run()
+	// if err != nil {
+	// 	return "", err
+	// }
 
 	// List directories
 	dirEntries, err = os.ReadDir(filepath.Join(mountDir, "sbin"))
+
 	if err != nil {
 		log.Error().Msg("Unable to read directory entries")
 		return "", err
@@ -128,8 +133,12 @@ func mountImageToRandomDir(pathToBaseImage string) (string, func(), error) {
 	}
 
 	cleanUp := func() {
+		log.Debug().Msg("Cleaning up...")
+		// syscall.Unmount(randomDirName, 0)
+		imageFile.Close()
 		unmount()
-		os.RemoveAll(randomDirName)
+		// umount2("/tmp/914241525", 0)            = -1 EBUSY (Device or resource busy)
+		// os.RemoveAll(randomDirName)
 	}
 
 	return randomDirName, cleanUp, nil
