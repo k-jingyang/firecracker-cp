@@ -5,13 +5,19 @@ Control plane for spinning up Firecracker microVMs
 ## Objectives of this project
 1. Play around, understand Firecracker
    1. Understand unfamiliar OS concepts
-2. Try out API framework of Go
+2. Try out [API framework of Go](https://github.com/go-chi/chi)
 
 ## Outcome
 1. An API call to spin up a Firecracker VM
    - Params: SSH public key
-   - Returns: An IP address that I can SSH in with a SSH secret key
-## To-Do
+   - Returns: An IP address that I can SSH in with the corresponding SSH secret key
+
+## Program flow
+1. Start process with base image
+2. Create read-only squashfs image from base image
+3. Start API server
+
+## References
 
 1. How to have a new rootfs for each instance, without copying rootfs
    1. Copy-on-write - https://github.com/firecracker-microvm/firecracker/discussions/3061, allows SSH keys to be added
