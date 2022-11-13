@@ -1,10 +1,13 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 
@@ -45,13 +48,13 @@ buildSquashFSImage's logic, based off https://github.com/firecracker-microvm/fir
 3. Copy overlay_init into /sbin/overlay-init
 3. Make squashfs
 
-Returns filepath to squashfs image
 */
-func buildSquashFSImage(pathToBaseImage string, pathToInitScript string) (string, error) {
+func buildSquashFSImage(pathToBaseImage string, pathToInitScript string, pathToNewSquashImage string) error {
 
 	mountDir, cleanUp, err := mountImageToRandomDir(pathToBaseImage)
 	if err != nil {
-		return "", err
+		return err
+
 	}
 	defer cleanUp()
 
@@ -63,7 +66,7 @@ func buildSquashFSImage(pathToBaseImage string, pathToInitScript string) (string
 	dirEntries, err := os.ReadDir(filepath.Join(mountDir))
 	if err != nil {
 		log.Error().Msg("Unable to read directory entries")
-		return "", err
+		return err
 	}
 
 	for _, entry := range dirEntries {
@@ -73,39 +76,44 @@ func buildSquashFSImage(pathToBaseImage string, pathToInitScript string) (string
 	// Copy overlay_init
 	destination, err := os.Create(filepath.Join(mountDir, "sbin", "overlay-init"))
 	if err != nil {
-		return "", err
+		return err
 	}
 	defer destination.Close()
 
-	overlay_init, err := os.ReadFile(filepath.Join(".", "overlay_init"))
+	overlay_init, err := os.ReadFile(filepath.Join(".", pathToInitScript))
 	if err != nil {
-		return "", err
+		return err
+
 	}
 
 	_, err = destination.Write(overlay_init)
 	if err != nil {
-		return "", err
+		return err
+
 	}
 
-	// mksquashfs := exec.Command("mksquashfs", mountDir, "new-rootfs.img", "-noappend")
-	// err = mksquashfs.Run()
-	// if err != nil {
-	// 	return "", err
-	// }
+	// TODO Use zstd?
+	mksquashfs := exec.Command("mksquashfs", mountDir, pathToNewSquashImage, "-noappend")
+	err = mksquashfs.Run()
+	if err != nil {
+		return err
+
+	}
 
 	// List directories
 	dirEntries, err = os.ReadDir(filepath.Join(mountDir, "sbin"))
 
 	if err != nil {
 		log.Error().Msg("Unable to read directory entries")
-		return "", err
+		return err
+
 	}
 
 	for _, entry := range dirEntries {
 		fmt.Println(entry.Name())
 	}
 
-	return "test", nil
+	return nil
 
 }
 
@@ -145,10 +153,18 @@ func mountImageToRandomDir(pathToBaseImage string) (string, func(), error) {
 
 func main() {
 
-	_, err := buildSquashFSImage("./bionic.rootfs.base.ext4", "")
+	const squashFsImage = "./squash-rootfs.img"
 
-	if err != nil {
-		log.Error().Err(err).Send()
+	_, err := os.Stat(squashFsImage)
+	if errors.Is(err, fs.ErrNotExist) {
+		log.Debug().Msg(squashFsImage + "does not exist. Creating...")
+
+		err = buildSquashFSImage("./bionic.rootfs.base.ext4", "./overlay_init", squashFsImage)
+
+		if err != nil {
+			log.Error().Err(err).Msg("Unable to create" + squashFsImage + "image")
+			os.Exit(1)
+		}
 	}
 
 	// socketRootDir := "/tmp/firecracker"
