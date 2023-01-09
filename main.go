@@ -1,26 +1,26 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"io/ioutil"
+	"math/rand"
+	"net/http"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
+	"strconv"
+	"time"
 
+	fc "github.com/firecracker-microvm/firecracker-go-sdk"
+	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/middleware"
 	"github.com/rs/zerolog/log"
 	"pault.ag/go/loopback"
 )
-
-// stdin, stdout, stderror
-func getIO() (io.Reader, io.Writer, io.Writer) {
-	stdout, _ := os.OpenFile("out.log", os.O_RDWR|os.O_CREATE, 0755)
-	stderr, _ := os.OpenFile("err.log", os.O_RDWR|os.O_CREATE, 0755)
-	return nil, stdout, stderr
-}
 
 func deleteDirContents(dirName string) error {
 	files, err := ioutil.ReadDir(dirName)
@@ -153,6 +153,7 @@ func mountImageToRandomDir(pathToBaseImage string) (string, func(), error) {
 
 func main() {
 
+	// Make squashFS image
 	const squashFsImage = "./squash-rootfs.img"
 
 	_, err := os.Stat(squashFsImage)
@@ -167,38 +168,59 @@ func main() {
 		}
 	}
 
-	// socketRootDir := "/tmp/firecracker"
+	// Setup directory to store socket files
+	socketRootDir := "/tmp/firecracker"
+	os.MkdirAll(socketRootDir, fs.ModePerm)
+	defer deleteDirContents(socketRootDir)
 
-	// // Create folder if doesn't exist and clean up after everything
-	// os.MkdirAll(socketRootDir, fs.ModePerm)
-	// defer deleteDirContents(socketRootDir)
+	// Start API server
+	r := chi.NewRouter()
+	r.Use(middleware.Logger)
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("welcome"))
+	})
+	r.Get("/vm", func(w http.ResponseWriter, r *http.Request) {
+		go makeVM(socketRootDir)
+	})
+	log.Info().Msg("Starting API server")
+	http.ListenAndServe(":3000", r)
+}
 
-	// // Generate a socket file name
-	// rand.Seed(time.Now().Unix())
-	// id := strconv.Itoa(rand.Intn(10000000))
-	// sockName := id + ".sock"
-	// log.Println("Using sock", sockName)
+func makeVM(socketDir string) {
 
-	// // _, stdout, stderr := getIO()
+	// Create a unique ID
+	rand.Seed(time.Now().Unix())
+	id := strconv.Itoa(rand.Intn(10000000))
+	sockName := id + ".sock"
+	log.Debug().Msg("Using sock " + sockName)
 
-	// command := fc.VMCommandBuilder{}.
-	// 	WithBin("firecracker").
-	// 	WithSocketPath(path.Join(socketRootDir, sockName)). // should autogenerate and clean up after exit
-	// 	WithArgs([]string{"--config-file", "vm_config.json", "--id", id}).
-	// 	WithStdin(os.Stdin).
-	// 	WithStdout(os.Stdout).
-	// 	WithStderr(os.Stderr).
-	// 	Build(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 
-	// done := make(chan error)
-	// go func() {
-	// 	done <- command.Run()
-	// }()
+	// Create logs files
+	// TODO Is there a better way to create logs inside logs/ other than pre-creating /logs
+	stdout, _ := os.Create("logs/" + id + "-out.log")
+	stderr, _ := os.Create("logs/" + id + "-err.log")
 
-	// // How to handle interrupt? i.e. ctrl-c?
+	defer stdout.Close()
+	defer stderr.Close()
 
-	// // <-ctx.Done()
-	// <-done
-	// fmt.Println("Done..")
+	command := fc.VMCommandBuilder{}.
+		WithBin("firecracker").
+		WithSocketPath(path.Join(socketDir, sockName)). // should autogenerate and clean up after exit
+		WithArgs([]string{"--config-file", "vm_config.json", "--id", id}).
+		WithStdin(nil).
+		WithStdout(stdout).
+		WithStderr(stderr).
+		Build(ctx)
 
+	go func() {
+		command.Run()
+	}()
+
+	time.Sleep(10 * time.Second)
+
+	log.Debug().Msg("Cancelling " + id)
+	cancel()
+	log.Debug().Msg("Ended...")
+	// // // How to handle interrupt? i.e. ctrl-c?
 }
