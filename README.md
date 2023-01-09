@@ -36,3 +36,8 @@ Control plane for spinning up Firecracker microVMs
 ```json
 "host_dev_name": "tap0" // unqiue resource
 ```
+
+## Learnings
+1. We can use overlayfs to layer a writable layer ontop of a read-only base image as the rootfs of the uVM (ala Docker)
+2. squashFS makes a good filesystem for a read-only image (original was 300MB, compressed to 58MB)
+3. Basics. But IP forwarding has to be enabled if the host is doing any form of packet routing (i.e. passing the packet on where the recipient is not itself)
