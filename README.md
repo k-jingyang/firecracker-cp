@@ -30,3 +30,9 @@ Control plane for spinning up Firecracker microVMs
    1. See https://github.com/firecracker-microvm/firecracker/blob/main/docs/network-setup.md
 4. Look at [firecracker-containerd](https://github.com/firecracker-microvm/firecracker-containerd)
    1. See how firecracker VMs are created with the same root base image
+
+## TODO
+- [ ] Currently, we're unable to start multiple uVMs concurrently, because of `vm_config.json`. Have to find ways to create a tap per uVM and configure the uVM via `VMCommandBuilder` instead of `vm_config.json`
+```json
+"host_dev_name": "tap0" // unqiue resource
+```
