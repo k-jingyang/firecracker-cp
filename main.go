@@ -194,7 +194,7 @@ func makeVM(socketDir string) {
 	sockName := id + ".sock"
 	log.Debug().Msg("Using sock " + sockName)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, _ := context.WithCancel(context.Background())
 
 	// Create logs files
 	// TODO Is there a better way to create logs inside logs/ other than pre-creating /logs
@@ -213,14 +213,5 @@ func makeVM(socketDir string) {
 		WithStderr(stderr).
 		Build(ctx)
 
-	go func() {
-		command.Run()
-	}()
-
-	time.Sleep(10 * time.Second)
-
-	log.Debug().Msg("Cancelling " + id)
-	cancel()
-	log.Debug().Msg("Ended...")
-	// // // How to handle interrupt? i.e. ctrl-c?
+	command.Run()
 }
