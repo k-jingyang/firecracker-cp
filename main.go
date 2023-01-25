@@ -19,6 +19,7 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/rs/zerolog/log"
+	"github.com/songgao/water"
 	"pault.ag/go/loopback"
 )
 
@@ -155,7 +156,6 @@ func main() {
 
 	// Make squashFS image
 	const squashFsImage = "./squash-rootfs.img"
-
 	_, err := os.Stat(squashFsImage)
 	if errors.Is(err, fs.ErrNotExist) {
 		log.Debug().Msg(squashFsImage + "does not exist. Creating...")
@@ -173,7 +173,13 @@ func main() {
 	os.MkdirAll(socketRootDir, fs.ModePerm)
 	defer deleteDirContents(socketRootDir)
 
-	// Start API server
+	// Create TAP
+	// TODO: Need to clean up after configuring networking config? As it currently removes itself after program exit, when there's no networking configured
+
+	tap := createTAP()
+	log.Debug().Msgf("Creating TAP device %s", tap)
+
+	// Configure API server
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
@@ -182,8 +188,15 @@ func main() {
 	r.Get("/vm", func(w http.ResponseWriter, r *http.Request) {
 		go makeVM(socketRootDir)
 	})
-	log.Info().Msg("Starting API server")
-	http.ListenAndServe(":3000", r)
+
+	// Start API server
+	const port = 3000
+	log.Info().Msgf("Starting API server at %d", port)
+	err = http.ListenAndServe(fmt.Sprintf(":%d", port), r)
+
+	if err != nil {
+		log.Error().Msg(err.Error())
+	}
 }
 
 func makeVM(socketDir string) {
@@ -214,4 +227,12 @@ func makeVM(socketDir string) {
 		Build(ctx)
 
 	command.Run()
+}
+
+func createTAP() string {
+	tap, err := water.NewTAP("")
+	if err != nil {
+		log.Fatal().Msg(err.Error())
+	}
+	return tap.Name()
 }
