@@ -19,7 +19,6 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/rs/zerolog/log"
-	"github.com/songgao/water"
 	"pault.ag/go/loopback"
 )
 
@@ -173,11 +172,11 @@ func main() {
 	os.MkdirAll(socketRootDir, fs.ModePerm)
 	defer deleteDirContents(socketRootDir)
 
-	// Create TAP
-	// TODO: Need to clean up after configuring networking config? As it currently removes itself after program exit, when there's no networking configured
+	// Setup networking
+	network := newNetwork()
 
-	tap := createTAP()
-	log.Debug().Msgf("Creating TAP device %s", tap)
+	tap := network.createTAP()
+	log.Debug().Msgf("Created TAP device %s", tap.Name)
 
 	// Configure API server
 	r := chi.NewRouter()
@@ -227,12 +226,4 @@ func makeVM(socketDir string) {
 		Build(ctx)
 
 	command.Run()
-}
-
-func createTAP() string {
-	tap, err := water.NewTAP("")
-	if err != nil {
-		log.Fatal().Msg(err.Error())
-	}
-	return tap.Name()
 }
