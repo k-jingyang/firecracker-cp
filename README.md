@@ -46,8 +46,9 @@ Control plane for spinning up Firecracker microVMs
    1. Add a TAP device and setting its IP to 172.16.0.1
    ```bash
    sudo ip tuntap add tap0 mode tap
-   sudo ip addr add 172.16.0.1/24 dev tap0 # this creates a route that all packets for 172.16.0.0 will go through tap0
+   sudo ip addr add 172.16.0.1/24 dev tap0 
    sudo ip link set tap0 up # Interface will only be active after a proccess uses your tap interface (i.e. firecracker)
+   # once tap0 is given IP address and UP-ed, a route will be created. Run route command
    ```
    2. Configure firecracker with
    ```json
@@ -58,7 +59,14 @@ Control plane for spinning up Firecracker microVMs
          "host_dev_name": "tap0"
       }
    ],
-   ```
+
 5. Because each host TAP device routes for its subnet, we're unable to create another TAP device on the same host that uses the same subnet
    1. Since each uVM has to has its own TAP device, each uVM needs to be in its own subnet
-   2. Unless we do a bridge interface??
+   2. Unless we do a bridge interface.
+6. [A linux bridge](https://developers.redhat.com/blog/2018/10/22/introduction-to-linux-interfaces-for-virtual-networking#bridge), where you can attach multiple virtual interface to the bridge (also an interface). Only the bridge requires an IP and it can forward packets to the respective attached interfaces. Hence, all the attached virtual interfaces can be in the same subnet.
+   1. Same learnings apply here as a TAP device
+      1. Give it an IP address, and UP both the bridge and the TAP
+
+## Questions
+1. `firecracker-cp` creates the TAP interface, however, firecracker is unable to use it as the tap interface is busy. How to handle this? Persist and close
+   1. But got a different error

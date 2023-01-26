@@ -18,17 +18,28 @@ type network struct {
 // Create and attach TAP interface to the network bridge
 // Returns the created TAP interface
 func (n *network) createTAP() *net.Interface {
-	tap, err := water.New(water.Config{
+	config := water.Config{
 		DeviceType: water.TAP,
-	})
+	}
+	config.MultiQueue = true
+
+	// So that TAP interface is not deleted after closing it
+	config.Persist = true
+
+	tap, err := water.New(config)
+	if err != nil {
+		log.Fatal().Msg(err.Error())
+	}
+
+	// Close its descriptor so that firecracker can use the TAP interface
+	err = tap.Close()
 	if err != nil {
 		log.Fatal().Msg(err.Error())
 	}
 
 	tapIfce, err := net.InterfaceByName(tap.Name())
-
 	if err != nil {
-		log.Fatal().Msg(err.Error())
+		log.Fatal().Err(err).Msgf("Umable to find %s interface", tap.Name())
 	}
 
 	n.bridge.AddSlaveIfc(tapIfce)

@@ -204,7 +204,7 @@ func makeVM(socketDir string) {
 	rand.Seed(time.Now().Unix())
 	id := strconv.Itoa(rand.Intn(10000000))
 	sockName := id + ".sock"
-	log.Debug().Msg("Using sock " + sockName)
+	log.Debug().Msgf("Creating uVM and using %s as API socket", sockName)
 
 	ctx, _ := context.WithCancel(context.Background())
 
