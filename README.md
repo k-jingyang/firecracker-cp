@@ -68,5 +68,6 @@ Control plane for spinning up Firecracker microVMs
       1. Give it an IP address, and UP both the bridge and the TAP
 
 ## Questions
-1. `firecracker-cp` creates the TAP interface, however, firecracker is unable to use it as the tap interface is busy. How to handle this? Persist and close
-   1. But got a different error, most likely due to the library's TAP creation implementation and using `ip tuntap`
+1. `firecracker-cp` creates the TAP interface, however, firecracker is unable to use it as the tap interface is busy. How to handle this? 
+   - Persist and close
+   - Firecracker does not support MultiQueue TAP interfance, whatever is this..?
