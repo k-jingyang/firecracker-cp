@@ -16,9 +16,11 @@ import (
 	"time"
 
 	fc "github.com/firecracker-microvm/firecracker-go-sdk"
+	"github.com/firecracker-microvm/firecracker-go-sdk/client/models"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/rs/zerolog/log"
+	"github.com/samber/lo"
 	"pault.ag/go/loopback"
 )
 
@@ -185,7 +187,7 @@ func main() {
 		w.Write([]byte("welcome"))
 	})
 	r.Get("/vm", func(w http.ResponseWriter, r *http.Request) {
-		go makeVM(socketRootDir)
+		go makeVM(socketRootDir, network)
 	})
 
 	// Start API server
@@ -198,7 +200,7 @@ func main() {
 	}
 }
 
-func makeVM(socketDir string) {
+func makeVM(socketDir string, network *network) {
 
 	// Create a unique ID
 	rand.Seed(time.Now().Unix())
@@ -206,7 +208,7 @@ func makeVM(socketDir string) {
 	sockName := id + ".sock"
 	log.Debug().Msgf("Creating uVM and using %s as API socket", sockName)
 
-	ctx, _ := context.WithCancel(context.Background())
+	// ctx, _ := context.WithCancel(context.Background())
 
 	// Create logs files
 	// TODO Is there a better way to create logs inside logs/ other than pre-creating /logs
@@ -216,14 +218,53 @@ func makeVM(socketDir string) {
 	defer stdout.Close()
 	defer stderr.Close()
 
-	command := fc.VMCommandBuilder{}.
-		WithBin("firecracker").
-		WithSocketPath(path.Join(socketDir, sockName)). // should autogenerate and clean up after exit
-		WithArgs([]string{"--config-file", "vm_config.json", "--id", id}).
-		WithStdin(nil).
-		WithStdout(stdout).
-		WithStderr(stderr).
-		Build(ctx)
+	ip, ipNet := network.claimNextIp()
+	ipNet.IP = ip
 
-	command.Run()
+	config := fc.Config{
+		SocketPath:      path.Join(socketDir, sockName),
+		LogPath:         stdout.Name(),
+		FifoLogWriter:   stdout,
+		LogLevel:        "Info",
+		KernelImagePath: "vmlinux.bin",
+		KernelArgs:      "console=ttyS0 reboot=k panic=1 pci=off overlay_root=ram init=/sbin/overlay-init",
+		Drives: []models.Drive{
+			{
+				DriveID:      lo.ToPtr("roortfs"),
+				PathOnHost:   lo.ToPtr("squash.img"),
+				IsRootDevice: lo.ToPtr(true),
+				IsReadOnly:   lo.ToPtr(true),
+				CacheType:    lo.ToPtr("Unsafe"),
+				IoEngine:     lo.ToPtr("Sync"),
+				RateLimiter:  nil,
+			},
+		},
+		MachineCfg: models.MachineConfiguration{
+			VcpuCount:       lo.ToPtr(int64(2)),
+			MemSizeMib:      lo.ToPtr(int64(1024)),
+			Smt:             lo.ToPtr(false),
+			TrackDirtyPages: false,
+		},
+
+		NetworkInterfaces: fc.NetworkInterfaces{
+			fc.NetworkInterface{
+				StaticConfiguration: &fc.StaticNetworkConfiguration{
+					IPConfiguration: &fc.IPConfiguration{
+						IPAddr:  *ipNet,
+						IfName:  "eth0",
+						Gateway: network.getBridgeIpV4Addr(),
+					},
+					HostDevName: "tap0",
+				},
+			},
+		},
+		// what is MetricsFifo and LogsFifo
+	}
+
+	uVM, err := fc.NewMachine(context.Background(), config)
+	if err != nil {
+		log.Error().Msg(err.Error())
+	}
+
+	uVM.Start(context.Background())
 }

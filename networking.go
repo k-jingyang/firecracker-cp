@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net"
 
 	goipam "github.com/metal-stack/go-ipam"
@@ -30,6 +32,7 @@ func (n *network) createTAP() *net.Interface {
 		},
 	}
 
+	// Create the TAP interface
 	tap, err := water.New(config)
 	if err != nil {
 		log.Fatal().Msg(err.Error())
@@ -46,6 +49,7 @@ func (n *network) createTAP() *net.Interface {
 		log.Fatal().Err(err).Msgf("Umable to find %s interface", tap.Name())
 	}
 
+	// Attach TAP interface to the bridge
 	n.bridge.AddSlaveIfc(tapIfce)
 
 	return tapIfce
@@ -69,7 +73,7 @@ func (n *network) claimNextIp() (net.IP, *net.IPNet) {
 	return ip, ipNet
 }
 
-func newNetwork() network {
+func newNetwork() *network {
 
 	bridgeName := "firecracker-br"
 
@@ -103,5 +107,37 @@ func newNetwork() network {
 		log.Fatal().Msg(err.Error())
 	}
 
-	return network
+	return &network
+}
+
+func (n *network) getBridgeIpV4Addr() net.IP {
+	ip, err := getInterfaceIpv4Addr(n.bridge.NetInterface().Name)
+	if err != nil {
+		log.Fatal().Err(err)
+	}
+	return ip
+
+}
+
+func getInterfaceIpv4Addr(interfaceName string) (addr net.IP, err error) {
+	var (
+		ief      *net.Interface
+		addrs    []net.Addr
+		ipv4Addr net.IP
+	)
+	if ief, err = net.InterfaceByName(interfaceName); err != nil { // get interface
+		return nil, errors.New(fmt.Sprintf("unable to get interface %s", interfaceName))
+	}
+	if addrs, err = ief.Addrs(); err != nil { // get addresses
+		return nil, errors.New(fmt.Sprintf("unable to get addresses of interface %s", interfaceName))
+	}
+	for _, addr := range addrs { // get ipv4 address
+		if ipv4Addr = addr.(*net.IPNet).IP.To4(); ipv4Addr != nil {
+			break
+		}
+	}
+	if ipv4Addr == nil {
+		return nil, errors.New(fmt.Sprintf("interface %s don't have an ipv4 address\n", interfaceName))
+	}
+	return ipv4Addr, nil
 }
