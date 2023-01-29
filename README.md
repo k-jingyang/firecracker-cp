@@ -31,12 +31,6 @@ Control plane for spinning up Firecracker microVMs
 4. Look at [firecracker-containerd](https://github.com/firecracker-microvm/firecracker-containerd)
    1. See how firecracker VMs are created with the same root base image
 
-## TODO
-- [ ] Currently, we're unable to start multiple uVMs concurrently, because of `vm_config.json`. Have to find ways to create a tap per uVM and configure the uVM via `VMCommandBuilder` instead of `vm_config.json`
-```json
-"host_dev_name": "tap0" // unqiue resource
-```
-
 ## Learnings
 1. We can use overlayfs to layer a writable layer ontop of a read-only base image as the rootfs of the uVM (ala Docker)
 2. squashFS makes a good filesystem for a read-only image (original was 300MB, compressed to 58MB)
@@ -55,7 +49,6 @@ Control plane for spinning up Firecracker microVMs
    "boot_args": "console=ttyS0 reboot=k panic=1 pci=off ip=172.16.0.2:::255.255.255.0::eth0:off overlay_root=ram init=/sbin/overlay-init",
    "network-interfaces": [
       {
-         "iface_id": "eth0",
          "host_dev_name": "tap0"
       }
    ],
@@ -66,9 +59,17 @@ Control plane for spinning up Firecracker microVMs
 6. [A linux bridge](https://developers.redhat.com/blog/2018/10/22/introduction-to-linux-interfaces-for-virtual-networking#bridge), where you can attach multiple virtual interface to the bridge (also an interface). Only the bridge requires an IP and it can forward packets to the respective attached interfaces. Hence, all the attached virtual interfaces can be in the same subnet.
    1. Same learnings apply here as a TAP device
       1. Give it an IP address, and UP both the bridge and the TAP
-7. I was trying to do the aforementioned stuff manually with IPAM, but seems like it can all be done by using a [CNI](https://www.redhat.com/sysadmin/cni-kubernetes)
+7. I was trying to do the aforementioned stuff manually using IPAM and a bunch of networking libraries, but seems like it can all be done by using a [CNI](https://www.redhat.com/sysadmin/cni-kubernetes)
 
 ## Questions
 1. `firecracker-cp` creates the TAP interface, however, firecracker is unable to use it as the tap interface is busy. How to handle this? 
    - Persist and close
    - Firecracker does not support MultiQueue TAP interfance, whatever is this..?
+
+## To-Do
+1. Is there a way for doing hot reload?
+2. Understand [CNI](https://www.redhat.com/sysadmin/cni-kubernetes) and see how we can use it with Firecracker
+   1. https://github.com/firecracker-microvm/firecracker-go-sdk#cni
+3. See how we can improve redirect logging
+   1. 2 types of logging -> control plane's, and the uVM's logs
+4. Passing in SSH public key!
