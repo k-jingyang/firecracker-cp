@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"firecracker-cp/networking"
 	"fmt"
 	"io/fs"
 	"io/ioutil"
@@ -175,9 +176,9 @@ func main() {
 	defer deleteDirContents(socketRootDir)
 
 	// Setup networking
-	network := newNetwork()
+	network := networking.New()
 
-	tap := network.createTAP()
+	tap := network.CreateTAP()
 	log.Debug().Msgf("Created TAP device %s", tap.Name)
 
 	// Configure API server
@@ -200,7 +201,7 @@ func main() {
 	}
 }
 
-func makeVM(socketDir string, network *network) {
+func makeVM(socketDir string, network *networking.Network) {
 
 	// Create a unique ID
 	rand.Seed(time.Now().Unix())
@@ -218,13 +219,12 @@ func makeVM(socketDir string, network *network) {
 	defer stdout.Close()
 	defer stderr.Close()
 
-	ip, ipNet := network.claimNextIp()
+	ip, ipNet := network.ClaimNextIp()
 	ipNet.IP = ip
 
 	config := fc.Config{
 		SocketPath:      path.Join(socketDir, sockName),
 		LogPath:         stdout.Name(),
-		FifoLogWriter:   stdout,
 		LogLevel:        "Info",
 		KernelImagePath: "vmlinux.bin",
 		KernelArgs:      "console=ttyS0 reboot=k panic=1 pci=off overlay_root=ram init=/sbin/overlay-init",
@@ -252,7 +252,7 @@ func makeVM(socketDir string, network *network) {
 					IPConfiguration: &fc.IPConfiguration{
 						IPAddr:  *ipNet,
 						IfName:  "eth0",
-						Gateway: network.getBridgeIpV4Addr(),
+						Gateway: network.GetBridgeIpV4Addr(),
 					},
 					HostDevName: "tap0",
 				},

@@ -1,4 +1,4 @@
-package main
+package networking
 
 import (
 	"context"
@@ -14,7 +14,7 @@ import (
 
 // should this be in its own package?
 // what are go best practices in separating packages?
-type network struct {
+type Network struct {
 	bridge     tenus.Bridger
 	tapDevices []water.Interface
 	ipam       goipam.Ipamer
@@ -23,7 +23,7 @@ type network struct {
 
 // Create and attach TAP interface to the network bridge
 // Returns the created TAP interface
-func (n *network) createTAP() *net.Interface {
+func (n *Network) CreateTAP() *net.Interface {
 
 	config := water.Config{
 		DeviceType: water.TAP,
@@ -55,7 +55,7 @@ func (n *network) createTAP() *net.Interface {
 	return tapIfce
 }
 
-func (n *network) claimNextIp() (net.IP, *net.IPNet) {
+func (n *Network) ClaimNextIp() (net.IP, *net.IPNet) {
 	ipam := n.ipam
 	prefix := n.prefix
 
@@ -73,7 +73,7 @@ func (n *network) claimNextIp() (net.IP, *net.IPNet) {
 	return ip, ipNet
 }
 
-func newNetwork() *network {
+func New() *Network {
 
 	bridgeName := "firecracker-br"
 
@@ -96,10 +96,10 @@ func newNetwork() *network {
 		log.Fatal().Msg(err.Error())
 	}
 
-	network := network{bridge: br, ipam: ipam, prefix: *prefix}
+	network := Network{bridge: br, ipam: ipam, prefix: *prefix}
 
 	// Assign IP address to bridge
-	bridgeIp, bridgeIpNet := network.claimNextIp()
+	bridgeIp, bridgeIpNet := network.ClaimNextIp()
 	network.bridge.SetLinkIp(bridgeIp, bridgeIpNet)
 
 	// Bring the bridge up
@@ -110,7 +110,7 @@ func newNetwork() *network {
 	return &network
 }
 
-func (n *network) getBridgeIpV4Addr() net.IP {
+func (n *Network) GetBridgeIpV4Addr() net.IP {
 	ip, err := getInterfaceIpv4Addr(n.bridge.NetInterface().Name)
 	if err != nil {
 		log.Fatal().Err(err)
