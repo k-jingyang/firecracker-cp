@@ -63,7 +63,7 @@ Control plane for spinning up Firecracker microVMs
 8. I was trying to do the aforementioned stuff manually using IPAM and a bunch of networking libraries, but seems like it can all be done by using a [CNI](https://www.redhat.com/sysadmin/cni-kubernetes)
 
 ## Questions
-1. What is [ballooning]?
+1. What is [ballooning](https://www.youtube.com/watch?v=mxproh2qaU8)?
    - I've seen it at work too.
 
 ## To-Do
