@@ -59,7 +59,9 @@ Control plane for spinning up Firecracker microVMs
 6. [A linux bridge](https://developers.redhat.com/blog/2018/10/22/introduction-to-linux-interfaces-for-virtual-networking#bridge), where you can attach multiple virtual interface to the bridge (also an interface). Only the bridge requires an IP and it can forward packets to the respective attached interfaces. Hence, all the attached virtual interfaces can be in the same subnet.
    1. Same learnings apply here as a TAP device
       1. Give it an IP address, and UP both the bridge and the TAP
-7. I was trying to do the aforementioned stuff manually using IPAM and a bunch of networking libraries, but seems like it can all be done by using a [CNI](https://www.redhat.com/sysadmin/cni-kubernetes)
+7. Firecracker does not support Multi-Queue TAP interfaces
+   1. Multi-Queue allows parallelization of RX and TX
+8. I was trying to do the aforementioned stuff manually using IPAM and a bunch of networking libraries, but seems like it can all be done by using a [CNI](https://www.redhat.com/sysadmin/cni-kubernetes)
 
 ## Questions
 1. `firecracker-cp` creates the TAP interface, however, firecracker is unable to use it as the tap interface is busy. How to handle this? 
