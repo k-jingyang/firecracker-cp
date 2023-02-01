@@ -75,6 +75,7 @@ Control plane for spinning up Firecracker microVMs
    1. 2 types of logging -> control plane's, and the uVM's logs
 4. Passing in SSH public key!
 5. Try out MMDS v2, and use that
+6. Figure out how to run script on uVM boot to get the SSH key
 
 ## On CNI
 1. CNI is responsible for inserting an interface into a network namespace and configures the interface (e.g. assigning an IP address)
