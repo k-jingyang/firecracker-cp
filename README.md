@@ -61,6 +61,9 @@ Control plane for spinning up Firecracker microVMs
 7. Firecracker does not support Multi-Queue TAP interfaces
    1. Multi-Queue allows parallelization of RX and TX
 8. I was trying to do the aforementioned stuff manually using IPAM and a bunch of networking libraries, but seems like it can all be done by using a [CNI](https://www.redhat.com/sysadmin/cni-kubernetes)
+   1. Wow, using CNI as documented [here](https://www.redhat.com/sysadmin/cni-kubernetes) does everything out of the box
+      1. Config is in `/etc/cni/conf.d/fcnet.conflist` and binaries are in `/opt/cni/bin` on my local PC
+9. as
 
 ## Questions
 1. What is [ballooning](https://www.youtube.com/watch?v=mxproh2qaU8)?
@@ -68,17 +71,15 @@ Control plane for spinning up Firecracker microVMs
 
 ## To-Do
 1. Is there a way for doing hot reload?
-2. Understand [CNI](https://www.redhat.com/sysadmin/cni-kubernetes) and see how we can use it with Firecracker
-   1. https://github.com/firecracker-microvm/firecracker-go-sdk#cni
-3. Add CNI plugins binaries into base image
-4. See how we can improve and redirect logging
+2. See how we can improve and redirect logging
    1. 2 types of logging -> control plane's, and the uVM's logs
-5. Passing in SSH public key!
+4. Passing in SSH public key!
 
 ## On CNI
-
 1. CNI is responsible for inserting an interface into a network namespace and configures the interface (e.g. assigning an IP address)
 2. Is network namespace creation required or is it automatically created?
    - Should verify what happens if we don't create it. But seems like we have to create it.
 3. CNI plugins are meant to be chained.
    - In the example provided by in [firecracker-go-sdk](https://github.com/firecracker-microvm/firecracker-go-sdk#), `ptp`, `host-local`, `firewall`, and `tc-redirect-tap` are used
+4. `/etc/cni/conf.d/*.conflist` is a convention for CNI configs
+5. 

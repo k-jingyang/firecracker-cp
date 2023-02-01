@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"firecracker-cp/networking"
 	"fmt"
 	"io/fs"
 	"io/ioutil"
@@ -16,6 +15,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/firecracker-microvm/firecracker-go-sdk"
 	fc "github.com/firecracker-microvm/firecracker-go-sdk"
 	"github.com/firecracker-microvm/firecracker-go-sdk/client/models"
 	"github.com/go-chi/chi"
@@ -176,10 +176,10 @@ func main() {
 	defer deleteDirContents(socketRootDir)
 
 	// Setup networking
-	network := networking.New()
+	// network := networking.New()
 
-	tap := network.CreateTAP()
-	log.Debug().Msgf("Created TAP device %s", tap.Name)
+	// tap := network.CreateTAP()
+	// log.Debug().Msgf("Created TAP device %s", tap.Name)
 
 	// Configure API server
 	r := chi.NewRouter()
@@ -188,7 +188,7 @@ func main() {
 		w.Write([]byte("welcome"))
 	})
 	r.Get("/vm", func(w http.ResponseWriter, r *http.Request) {
-		go makeVM(socketRootDir, network)
+		go makeVM(socketRootDir)
 	})
 
 	// Start API server
@@ -201,7 +201,7 @@ func main() {
 	}
 }
 
-func makeVM(socketDir string, network *networking.Network) {
+func makeVM(socketDir string) {
 
 	// Create a unique ID
 	rand.Seed(time.Now().Unix())
@@ -219,8 +219,8 @@ func makeVM(socketDir string, network *networking.Network) {
 	defer stdout.Close()
 	defer stderr.Close()
 
-	ip, ipNet := network.ClaimNextIp()
-	ipNet.IP = ip
+	// ip, ipNet := network.ClaimNextIp()
+	// ipNet.IP = ip
 
 	config := fc.Config{
 		SocketPath:      path.Join(socketDir, sockName),
@@ -236,7 +236,7 @@ func makeVM(socketDir string, network *networking.Network) {
 				IsReadOnly:   lo.ToPtr(true),
 				CacheType:    lo.ToPtr("Unsafe"),
 				IoEngine:     lo.ToPtr("Sync"),
-				RateLimiter:  nil,
+				RateLimiter:  nil,git@github.com:awslabs/tc-redirect-tap.git
 			},
 		},
 		MachineCfg: models.MachineConfiguration{
@@ -248,13 +248,17 @@ func makeVM(socketDir string, network *networking.Network) {
 
 		NetworkInterfaces: fc.NetworkInterfaces{
 			fc.NetworkInterface{
-				StaticConfiguration: &fc.StaticNetworkConfiguration{
-					IPConfiguration: &fc.IPConfiguration{
-						IPAddr:  *ipNet,
-						IfName:  "eth0",
-						Gateway: network.GetBridgeIpV4Addr(),
-					},
-					HostDevName: "tap0",
+				// StaticConfiguration: &fc.StaticNetworkConfiguration{
+				// 	IPConfiguration: &fc.IPConfiguration{
+				// 		IPAddr:  *ipNet,
+				// 		IfName:  "eth0",
+				// 		Gateway: network.GetBridgeIpV4Addr(),
+				// 	},
+				// 	HostDevName: "tap0",
+				// },
+				CNIConfiguration: &firecracker.CNIConfiguration{
+					NetworkName: "fcnet",
+					IfName:      "veth0",
 				},
 			},
 		},
