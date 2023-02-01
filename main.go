@@ -175,12 +175,6 @@ func main() {
 	os.MkdirAll(socketRootDir, fs.ModePerm)
 	defer deleteDirContents(socketRootDir)
 
-	// Setup networking
-	// network := networking.New()
-
-	// tap := network.CreateTAP()
-	// log.Debug().Msgf("Created TAP device %s", tap.Name)
-
 	// Configure API server
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -209,8 +203,6 @@ func makeVM(socketDir string) {
 	sockName := id + ".sock"
 	log.Debug().Msgf("Creating uVM and using %s as API socket", sockName)
 
-	// ctx, _ := context.WithCancel(context.Background())
-
 	// Create logs files
 	// TODO Is there a better way to create logs inside logs/ other than pre-creating /logs
 	stdout, _ := os.Create("logs/" + id + "-out.log")
@@ -218,9 +210,6 @@ func makeVM(socketDir string) {
 
 	defer stdout.Close()
 	defer stderr.Close()
-
-	// ip, ipNet := network.ClaimNextIp()
-	// ipNet.IP = ip
 
 	config := fc.Config{
 		SocketPath:      path.Join(socketDir, sockName),
@@ -236,7 +225,7 @@ func makeVM(socketDir string) {
 				IsReadOnly:   lo.ToPtr(true),
 				CacheType:    lo.ToPtr("Unsafe"),
 				IoEngine:     lo.ToPtr("Sync"),
-				RateLimiter:  nil,git@github.com:awslabs/tc-redirect-tap.git
+				RateLimiter:  nil,
 			},
 		},
 		MachineCfg: models.MachineConfiguration{
@@ -248,14 +237,6 @@ func makeVM(socketDir string) {
 
 		NetworkInterfaces: fc.NetworkInterfaces{
 			fc.NetworkInterface{
-				// StaticConfiguration: &fc.StaticNetworkConfiguration{
-				// 	IPConfiguration: &fc.IPConfiguration{
-				// 		IPAddr:  *ipNet,
-				// 		IfName:  "eth0",
-				// 		Gateway: network.GetBridgeIpV4Addr(),
-				// 	},
-				// 	HostDevName: "tap0",
-				// },
 				CNIConfiguration: &firecracker.CNIConfiguration{
 					NetworkName: "fcnet",
 					IfName:      "veth0",

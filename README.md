@@ -61,9 +61,9 @@ Control plane for spinning up Firecracker microVMs
 7. Firecracker does not support Multi-Queue TAP interfaces
    1. Multi-Queue allows parallelization of RX and TX
 8. I was trying to do the aforementioned stuff manually using IPAM and a bunch of networking libraries, but seems like it can all be done by using a [CNI](https://www.redhat.com/sysadmin/cni-kubernetes)
-   1. Wow, using CNI as documented [here](https://www.redhat.com/sysadmin/cni-kubernetes) does everything out of the box
+   1. Wow, using CNI as documented [here](https://www.redhat.com/sysadmin/cni-kubernetes) does everything out of the box. I do have to build [tc-redirect-tap](https://github.com/awslabs/tc-redirect-tap) manually, just a `make all`
       1. Config is in `/etc/cni/conf.d/fcnet.conflist` and binaries are in `/opt/cni/bin` on my local PC
-9. as
+9. 
 
 ## Questions
 1. What is [ballooning](https://www.youtube.com/watch?v=mxproh2qaU8)?
