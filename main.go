@@ -241,6 +241,7 @@ func makeVM(socketDir string) {
 					NetworkName: "fcnet",
 					IfName:      "veth0",
 				},
+				AllowMMDS: true,
 			},
 		},
 		// what is MetricsFifo and LogsFifo
