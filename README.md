@@ -64,14 +64,19 @@ Control plane for spinning up Firecracker microVMs
    1. Wow, using CNI as documented [here](https://www.redhat.com/sysadmin/cni-kubernetes) does everything out of the box. I do have to build [tc-redirect-tap](https://github.com/awslabs/tc-redirect-tap) manually, just a `make all`
       1. Config is in `/etc/cni/conf.d/fcnet.conflist` and binaries are in `/opt/cni/bin` on my local PC
 9. MMDSv1 is configured easily using the sdk with a `AllowMMDS: true`
+10. Using overlay-init with retrieving from MMDS will not work because host needs the socket (the guest VM) to be up before it can send the request to the MMDS, whereas overlay-init runs before the VM comes up
 
 ## Questions
 1. What is [ballooning](https://www.youtube.com/watch?v=mxproh2qaU8)?
    - I've seen it at work too.
 2. Where is `host-local` IPAM storing IP addresses
+3. Why is it right to create the `/rom` folder while the `pivot_root` is `/mnt/rom`
+   1. Most likely `pivot_root` details
+
 ## To-Do
-1. Is there a way for doing hot reload?
-2. See how we can improve and redirect logging
+1. Fix `pivot_root: failed to change root from '/mnt' to '/mnt/rom': No such file or directory`
+2. Is there a way for doing hot reload?
+3. See how we can improve and redirect logging
    1. 2 types of logging -> control plane's, and the uVM's logs
 4. Passing in SSH public key!
 5. Try out MMDS v2, and use that

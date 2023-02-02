@@ -64,7 +64,8 @@ func buildSquashFSImage(pathToBaseImage string, pathToInitScript string, pathToN
 	// Create directories that will be used later for overlay
 	os.MkdirAll(filepath.Join(mountDir, "overlay", "work"), 755)
 	os.MkdirAll(filepath.Join(mountDir, "overlay", "root"), 755)
-	os.MkdirAll(filepath.Join(mountDir, "mnt", "rom"), 755)
+	os.MkdirAll(filepath.Join(mountDir, "mnt"), 755)
+	os.MkdirAll(filepath.Join(mountDir, "rom"), 755)
 
 	dirEntries, err := os.ReadDir(filepath.Join(mountDir))
 	if err != nil {
@@ -81,6 +82,7 @@ func buildSquashFSImage(pathToBaseImage string, pathToInitScript string, pathToN
 	if err != nil {
 		return err
 	}
+	os.Chmod(destination.Name(), os.FileMode(0755))
 	defer destination.Close()
 
 	overlay_init, err := os.ReadFile(filepath.Join(".", pathToInitScript))
@@ -162,10 +164,10 @@ func main() {
 	if errors.Is(err, fs.ErrNotExist) {
 		log.Debug().Msg(squashFsImage + "does not exist. Creating...")
 
-		err = buildSquashFSImage("./bionic.rootfs.base.ext4", "./overlay_init", squashFsImage)
+		err = buildSquashFSImage("./bionic.rootfs.base.ext4", "./overlay-init", squashFsImage)
 
 		if err != nil {
-			log.Error().Err(err).Msg("Unable to create" + squashFsImage + "image")
+			log.Error().Err(err).Msgf("Unable to create %s image", squashFsImage)
 			os.Exit(1)
 		}
 	}
@@ -219,8 +221,8 @@ func makeVM(socketDir string) {
 		KernelArgs:      "console=ttyS0 reboot=k panic=1 pci=off overlay_root=ram init=/sbin/overlay-init",
 		Drives: []models.Drive{
 			{
-				DriveID:      lo.ToPtr("roortfs"),
-				PathOnHost:   lo.ToPtr("squash.img"),
+				DriveID:      lo.ToPtr("rootfs"),
+				PathOnHost:   lo.ToPtr("squash-rootfs.img"),
 				IsRootDevice: lo.ToPtr(true),
 				IsReadOnly:   lo.ToPtr(true),
 				CacheType:    lo.ToPtr("Unsafe"),
