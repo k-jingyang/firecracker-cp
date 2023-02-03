@@ -63,22 +63,21 @@ Control plane for spinning up Firecracker microVMs
 8. I was trying to do the aforementioned stuff manually using IPAM and a bunch of networking libraries, but seems like it can all be done by using a [CNI](https://www.redhat.com/sysadmin/cni-kubernetes)
    1. Wow, using CNI as documented [here](https://www.redhat.com/sysadmin/cni-kubernetes) does everything out of the box. I do have to build [tc-redirect-tap](https://github.com/awslabs/tc-redirect-tap) manually, just a `make all`
       1. Config is in `/etc/cni/conf.d/fcnet.conflist` and binaries are in `/opt/cni/bin` on my local PC
-      2. `host-local` IPAM stores IP addresses in `/var/lib/cni/networks/fcnet`
+      2. `host-local` IPAM stores IP addresses in `/var/lib/cni/networks/fcnet`. Conveniently, `last_reserved_ip.0` has the last allocated IP address
 9. MMDSv1 is configured easily using the sdk with a `AllowMMDS: true`
 10. Using overlay-init with retrieving from MMDS will not work because host needs the socket (the guest VM) to be up before it can send the request to the MMDS, whereas overlay-init runs before the VM comes up
+11. Why is it right to create the `/rom` folder while the `pivot_root` is `/mnt/rom`
+    1. Because the `old_root` must be a path under `new_root` (e.g. if given `/mnt/rom`, when `/mnt` becomes the new root, old_root will be placed under `/rom` of the new `/mnt` root
 
 ## Questions
 1. What is [ballooning](https://www.youtube.com/watch?v=mxproh2qaU8)?
    - I've seen it at work too.
 2. Where is `host-local` IPAM storing IP addresses
    1. In 
-3. Why is it right to create the `/rom` folder while the `pivot_root` is `/mnt/rom`
-   1. Most likely details of `pivot_root`
 
 ## To-Do
 1. Passing in SSH public key, via disk image
-2. Getting the IP address of the newly created VM
-   1. Read from last_reserved_ip.0
+   1.
 
 ## On CNI
 1. CNI is responsible for inserting an interface into a network namespace and configures the interface (e.g. assigning an IP address)
