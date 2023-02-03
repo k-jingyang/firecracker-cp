@@ -63,6 +63,7 @@ Control plane for spinning up Firecracker microVMs
 8. I was trying to do the aforementioned stuff manually using IPAM and a bunch of networking libraries, but seems like it can all be done by using a [CNI](https://www.redhat.com/sysadmin/cni-kubernetes)
    1. Wow, using CNI as documented [here](https://www.redhat.com/sysadmin/cni-kubernetes) does everything out of the box. I do have to build [tc-redirect-tap](https://github.com/awslabs/tc-redirect-tap) manually, just a `make all`
       1. Config is in `/etc/cni/conf.d/fcnet.conflist` and binaries are in `/opt/cni/bin` on my local PC
+      2. `host-local` IPAM stores IP addresses in `/var/lib/cni/networks/fcnet`
 9. MMDSv1 is configured easily using the sdk with a `AllowMMDS: true`
 10. Using overlay-init with retrieving from MMDS will not work because host needs the socket (the guest VM) to be up before it can send the request to the MMDS, whereas overlay-init runs before the VM comes up
 
@@ -70,17 +71,14 @@ Control plane for spinning up Firecracker microVMs
 1. What is [ballooning](https://www.youtube.com/watch?v=mxproh2qaU8)?
    - I've seen it at work too.
 2. Where is `host-local` IPAM storing IP addresses
+   1. In 
 3. Why is it right to create the `/rom` folder while the `pivot_root` is `/mnt/rom`
-   1. Most likely `pivot_root` details
+   1. Most likely details of `pivot_root`
 
 ## To-Do
-1. Fix `pivot_root: failed to change root from '/mnt' to '/mnt/rom': No such file or directory`
-2. Is there a way for doing hot reload?
-3. See how we can improve and redirect logging
-   1. 2 types of logging -> control plane's, and the uVM's logs
-4. Passing in SSH public key!
-5. Try out MMDS v2, and use that
-6. Figure out how to run script on uVM boot to get the SSH key
+1. Passing in SSH public key, via disk image
+2. Getting the IP address of the newly created VM
+   1. Read from last_reserved_ip.0
 
 ## On CNI
 1. CNI is responsible for inserting an interface into a network namespace and configures the interface (e.g. assigning an IP address)
@@ -89,4 +87,3 @@ Control plane for spinning up Firecracker microVMs
 3. CNI plugins are meant to be chained.
    - In the example provided by in [firecracker-go-sdk](https://github.com/firecracker-microvm/firecracker-go-sdk#), `ptp`, `host-local`, `firewall`, and `tc-redirect-tap` are used
 4. `/etc/cni/conf.d/*.conflist` is a convention for CNI configs
-5. 

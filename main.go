@@ -20,10 +20,15 @@ import (
 	"github.com/firecracker-microvm/firecracker-go-sdk/client/models"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/render"
 	"github.com/rs/zerolog/log"
 	"github.com/samber/lo"
 	"pault.ag/go/loopback"
 )
+
+type CreateVMResponse struct {
+	IPAddress string `json:"ipAddress"`
+}
 
 func deleteDirContents(dirName string) error {
 	files, err := ioutil.ReadDir(dirName)
@@ -180,11 +185,12 @@ func main() {
 	// Configure API server
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("welcome"))
-	})
+	r.Use(render.SetContentType(render.ContentTypeJSON))
+
 	r.Get("/vm", func(w http.ResponseWriter, r *http.Request) {
-		go makeVM(socketRootDir)
+		ipAddr := makeVM(socketRootDir)
+		log.Debug().Msgf("IPaddr=%s", ipAddr)
+		render.JSON(w, r, CreateVMResponse{IPAddress: ipAddr})
 	})
 
 	// Start API server
@@ -197,7 +203,7 @@ func main() {
 	}
 }
 
-func makeVM(socketDir string) {
+func makeVM(socketDir string) string {
 
 	// Create a unique ID
 	rand.Seed(time.Now().Unix())
@@ -263,4 +269,12 @@ func makeVM(socketDir string) {
 	}
 
 	uVM.Start(context.Background())
+
+	if err != nil {
+		log.Error().Msg(err.Error())
+	}
+
+	// Get allocated IP address from CNI
+	ipBuf, err := ioutil.ReadFile("/var/lib/cni/networks/fcnet/last_reserved_ip.0")
+	return string(ipBuf)
 }
