@@ -20,7 +20,7 @@ pivot() {
     rw_root="$1"
     work_dir="$2"
     /bin/mount \
--o noatime,lowerdir=/,upperdir=${rw_root},workdir=${work_dir} \
+-o noatime,lowerdir=/tmp:/,upperdir=${rw_root},workdir=${work_dir} \
 -t overlay "overlayfs:${rw_root}" /mnt
     pivot_root /mnt /mnt/rom
 }
@@ -43,6 +43,7 @@ do_overlay() {
     mkdir -p /overlay/root /overlay/work
     pivot /overlay/root /overlay/work
 }
+
 # If we're given an overlay, ensure that it really exists. Panic if not
 if [ -n "$overlay_root" ] &&
     [ "$overlay_root" != ram ] &&
@@ -52,7 +53,11 @@ if [ -n "$overlay_root" ] &&
     echo "/dev/$overlay_root does not exist"
     exit 1
 fi
+
+# Mount ssh disk on /tmp
+mount -o ro,noload ${ssh_disk} /tmp
 do_overlay
+
 # invoke the actual system init program and procede with the boot
 # process
 exec /sbin/init $@

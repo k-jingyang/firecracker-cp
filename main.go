@@ -218,12 +218,20 @@ func makeVM(socketDir string) {
 		LogPath:         stdout.Name(),
 		LogLevel:        "Info",
 		KernelImagePath: "vmlinux.bin",
-		KernelArgs:      "console=ttyS0 reboot=k panic=1 pci=off overlay_root=ram init=/sbin/overlay-init",
+		KernelArgs:      "console=ttyS0 reboot=k panic=1 pci=off overlay_root=ram ssh_disk=/dev/vdb init=/sbin/overlay-init",
 		Drives: []models.Drive{
 			{
 				DriveID:      lo.ToPtr("rootfs"),
 				PathOnHost:   lo.ToPtr("squash-rootfs.img"),
 				IsRootDevice: lo.ToPtr(true),
+				IsReadOnly:   lo.ToPtr(true),
+				CacheType:    lo.ToPtr("Unsafe"),
+				IoEngine:     lo.ToPtr("Sync"),
+				RateLimiter:  nil,
+			}, {
+				DriveID:      lo.ToPtr("vol2"),
+				PathOnHost:   lo.ToPtr("ext4.img"),
+				IsRootDevice: lo.ToPtr(false),
 				IsReadOnly:   lo.ToPtr(true),
 				CacheType:    lo.ToPtr("Unsafe"),
 				IoEngine:     lo.ToPtr("Sync"),
