@@ -18,6 +18,7 @@ require (
 	github.com/containerd/fifo v1.0.0 // indirect
 	github.com/containernetworking/cni v1.0.1 // indirect
 	github.com/containernetworking/plugins v1.0.1 // indirect
+	github.com/diskfs/go-diskfs v1.3.0 // indirect
 	github.com/go-chi/render v1.0.2 // indirect
 	github.com/go-openapi/analysis v0.21.2 // indirect
 	github.com/go-openapi/errors v0.20.2 // indirect
@@ -41,9 +42,12 @@ require (
 	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/onsi/gomega v1.18.1 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
+	github.com/pierrec/lz4 v2.3.0+incompatible // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/pkg/xattr v0.4.1 // indirect
 	github.com/sirupsen/logrus v1.9.0 // indirect
 	github.com/stretchr/testify v1.8.1 // indirect
+	github.com/ulikunitz/xz v0.5.10 // indirect
 	github.com/vishvananda/netlink v1.1.1-0.20210330154013-f5de75959ad5 // indirect
 	github.com/vishvananda/netns v0.0.0-20210104183010-2eb08e3e575f // indirect
 	go.mongodb.org/mongo-driver v1.11.1 // indirect
@@ -53,5 +57,6 @@ require (
 	golang.org/x/sync v0.1.0 // indirect
 	golang.org/x/sys v0.4.0 // indirect
 	golang.org/x/text v0.6.0 // indirect
+	gopkg.in/djherbis/times.v1 v1.2.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )

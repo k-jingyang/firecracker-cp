@@ -68,17 +68,14 @@ Control plane for spinning up Firecracker microVMs
 10. Using overlay-init with retrieving from MMDS will not work because host needs the socket (the guest VM) to be up before it can send the request to the MMDS, whereas overlay-init runs before the VM comes up
 11. Why is it right to create the `/rom` folder while the `pivot_root` is `/mnt/rom`
     1. Because the `old_root` must be a path under `new_root` (e.g. if given `/mnt/rom`, when `/mnt` becomes the new root, old_root will be placed under `/rom` of the new `/mnt` root
-
+12. When you use mkfs.ext4 on a file too small (2MB), it gives that error that says that `Filesystem too small for a journal` and creates an ext2 instead.
 ## Questions
 1. What is [ballooning](https://www.youtube.com/watch?v=mxproh2qaU8)?
    - I've seen it at work too.
-2. Where is `host-local` IPAM storing IP addresses
-   1. In 
 
 ## To-Do
-1. Passing in SSH public key, via disk image
-   1.
-
+1. Write setup instructions
+2. Organise code
 ## On CNI
 1. CNI is responsible for inserting an interface into a network namespace and configures the interface (e.g. assigning an IP address)
 2. Is network namespace creation required or is it automatically created?
@@ -86,3 +83,15 @@ Control plane for spinning up Firecracker microVMs
 3. CNI plugins are meant to be chained.
    - In the example provided by in [firecracker-go-sdk](https://github.com/firecracker-microvm/firecracker-go-sdk#), `ptp`, `host-local`, `firewall`, and `tc-redirect-tap` are used
 4. `/etc/cni/conf.d/*.conflist` is a convention for CNI configs
+
+## To run
+1. `go build && sudo ./firecracker-cp`
+2. On another terminal,
+```bash
+curl -X POST localhost:3000/vm -d @-  << EOF
+{
+   "sshPubKey" : "xxx"
+}
+EOF
+```
+
