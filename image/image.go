@@ -1,0 +1,179 @@
+package image
+
+import (
+	"crypto/md5"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"io/fs"
+	"os"
+	"os/exec"
+	"path/filepath"
+
+	"github.com/diskfs/go-diskfs"
+	"github.com/rs/zerolog/log"
+	"pault.ag/go/loopback"
+)
+
+/*
+BuildSquashFSImage builds the necessary rootfs image for the uVM
+
+The logic, based off https://github.com/firecracker-microvm/firecracker/discussions/3061
+1. Mount base image
+2. Create directories in image to be used for overlay (https://windsock.io/the-overlay-filesystem/)
+  i. 	/overlay/work - scratch space
+  ii. 	/overlay/root - upperdir that provides the writeable layer
+  iii.	/mnt - the new root
+  iv. 	/mnt/rom - the old root
+3. Copy overlay_init into /sbin/overlay-init
+3. Make squashfs
+*/
+func BuildSquashFSImage(pathToBaseImage string, pathToInitScript string, pathToNewSquashImage string) error {
+	mountDir, cleanUp, err := mountImageToRandomDir(pathToBaseImage)
+	if err != nil {
+		return err
+
+	}
+	defer cleanUp()
+
+	// Create directories that will be used later for overlay
+	os.MkdirAll(filepath.Join(mountDir, "overlay", "work"), 0755)
+	os.MkdirAll(filepath.Join(mountDir, "overlay", "root"), 0755)
+	os.MkdirAll(filepath.Join(mountDir, "mnt"), 0755)
+	os.MkdirAll(filepath.Join(mountDir, "rom"), 0755)
+
+	dirEntries, err := os.ReadDir(filepath.Join(mountDir))
+	if err != nil {
+		log.Error().Msg("Unable to read directory entries")
+		return err
+	}
+
+	for _, entry := range dirEntries {
+		fmt.Println(entry.Name())
+	}
+
+	// Copy overlay_init
+	destination, err := os.Create(filepath.Join(mountDir, "sbin", "overlay-init"))
+	if err != nil {
+		return err
+	}
+	os.Chmod(destination.Name(), os.FileMode(0755))
+	defer destination.Close()
+
+	overlay_init, err := os.ReadFile(filepath.Join(".", pathToInitScript))
+	if err != nil {
+		return err
+
+	}
+	_, err = destination.Write(overlay_init)
+	if err != nil {
+		return err
+	}
+
+	// TODO Use zstd?
+	mksquashfs := exec.Command("mksquashfs", mountDir, pathToNewSquashImage, "-noappend")
+	err = mksquashfs.Run()
+	if err != nil {
+		return err
+	}
+
+	// List directories
+	dirEntries, err = os.ReadDir(filepath.Join(mountDir, "sbin"))
+
+	if err != nil {
+		log.Error().Msg("Unable to read directory entries")
+		return err
+
+	}
+
+	for _, entry := range dirEntries {
+		fmt.Println(entry.Name())
+	}
+
+	return nil
+
+}
+
+// mountImageToRandomDir mounts the image to a random directory and returns the mountpoint
+func mountImageToRandomDir(imagePath string) (string, func(), error) {
+	randomDirName, err := os.MkdirTemp("/tmp", "*")
+	if err != nil {
+		log.Error().Msg("Unable to create random folder")
+		return "", func() {}, err
+	}
+	log.Debug().Msgf("Random folder %s generated", randomDirName)
+
+	// Must open as RDWR
+	imageFile, err := os.OpenFile(imagePath, os.O_RDWR, 0)
+	if err != nil {
+		log.Error().Msg("Unable to open " + imagePath + " for reading")
+		return "", func() {}, err
+	}
+
+	log.Debug().Msgf("Mounting %s", imagePath)
+
+	_, unmount, err := loopback.MountImage(imageFile, randomDirName, "ext4", 0, "")
+	if err != nil {
+		log.Error().Err(err).Msg("Unable to mount")
+		return "", func() {}, err
+	}
+
+	cleanUp := func() {
+		log.Debug().Msgf("Unmounting %s", imagePath)
+		imageFile.Close()
+		unmount()
+		os.RemoveAll(randomDirName)
+	}
+
+	return randomDirName, cleanUp, nil
+}
+
+// Make SSH image from SSH key
+func MakeSSHDiskImage(sshPubKey []byte) (string, error) {
+	hash := (md5.Sum(sshPubKey))
+	hashStr := hex.EncodeToString(hash[:])
+	sshDiskImage := fmt.Sprintf("ssh_keys/%s.img", hashStr)
+
+	_, err := os.Stat(sshDiskImage)
+	fileExists := !errors.Is(err, fs.ErrNotExist)
+	if fileExists {
+		return sshDiskImage, nil
+	}
+
+	log.Debug().Msg(sshDiskImage + " does not exist. Creating...")
+
+	// Create empty image file and create filesystem
+	// TODO: Is there a more optimal size than 2MB
+	disk, err := diskfs.Create(sshDiskImage, 2000000, diskfs.Raw, diskfs.SectorSizeDefault)
+	if err != nil {
+		return "", err
+	}
+	log.Debug().Msgf("Created disk image for SSH key: %s", disk.File.Name())
+	mkext4 := exec.Command("mkfs.ext4", disk.File.Name())
+	err = mkext4.Run()
+	if err != nil {
+		return "", err
+	}
+
+	// Add SSH key into image
+	mountDir, cleanUp, err := mountImageToRandomDir(disk.File.Name())
+	if err != nil {
+		return "", err
+
+	}
+	defer cleanUp()
+	os.MkdirAll(filepath.Join(mountDir, "root", ".ssh"), 0700)
+	destination, err := os.Create(filepath.Join(mountDir, "root", ".ssh", "authorized_keys"))
+	if err != nil {
+		return "", err
+	}
+	os.Chmod(destination.Name(), os.FileMode(0644))
+	defer destination.Close()
+
+	_, err = destination.Write(sshPubKey)
+	if err != nil {
+		return "", err
+	}
+
+	return disk.File.Name(), nil
+}
