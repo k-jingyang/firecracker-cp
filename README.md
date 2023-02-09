@@ -3,7 +3,7 @@
 Control plane for spinning up Firecracker microVMs
 
 ## Objectives of this project
-1. Play around, understand Firecracker
+1. Play around and understand Firecracker
    1. Understand unfamiliar OS concepts
 2. Try out [API framework of Go](https://github.com/go-chi/chi)
 
@@ -60,8 +60,8 @@ Control plane for spinning up Firecracker microVMs
       1. Give it an IP address, and UP both the bridge and the TAP
 7. Firecracker does not support Multi-Queue TAP interfaces
    1. Multi-Queue allows parallelization of RX and TX
-8. I was trying to do the aforementioned stuff manually using IPAM and a bunch of networking libraries, but seems like it can all be done by using a [CNI](https://www.redhat.com/sysadmin/cni-kubernetes)
-   1. Wow, using CNI as documented [here](https://www.redhat.com/sysadmin/cni-kubernetes) does everything out of the box. I do have to build [tc-redirect-tap](https://github.com/awslabs/tc-redirect-tap) manually, just a `make all`
+8. I was trying to do the aforementioned stuff manually using IPAM and a bunch of networking libraries, but it can all be done by using a [CNI](https://www.redhat.com/sysadmin/cni-kubernetes)
+   1. Using CNI as documented [here](https://www.redhat.com/sysadmin/cni-kubernetes) does everything out of the box. I do have to build [tc-redirect-tap](https://github.com/awslabs/tc-redirect-tap) manually, just a `make all`
       1. Config is in `/etc/cni/conf.d/fcnet.conflist` and binaries are in `/opt/cni/bin` on my local PC
       2. `host-local` IPAM stores IP addresses in `/var/lib/cni/networks/fcnet`. Conveniently, `last_reserved_ip.0` has the last allocated IP address
 9. MMDSv1 is configured easily using the sdk with a `AllowMMDS: true`
@@ -69,13 +69,9 @@ Control plane for spinning up Firecracker microVMs
 11. Why is it right to create the `/rom` folder while the `pivot_root` is `/mnt/rom`
     1. Because the `old_root` must be a path under `new_root` (e.g. if given `/mnt/rom`, when `/mnt` becomes the new root, old_root will be placed under `/rom` of the new `/mnt` root
 12. When you use mkfs.ext4 on a file too small (2MB), it gives that error that says that `Filesystem too small for a journal` and creates an ext2 instead.
-## Questions
-1. What is [ballooning](https://www.youtube.com/watch?v=mxproh2qaU8)?
-   - I've seen it at work too.
+13. Ballooning 
+    1.  Allows the hypervisor to get memory from provisioned guest VMs
 
-## To-Do
-1. Write setup instructions
-2. Organise code
 ## On CNI
 1. CNI is responsible for inserting an interface into a network namespace and configures the interface (e.g. assigning an IP address)
 2. Is network namespace creation required or is it automatically created?
