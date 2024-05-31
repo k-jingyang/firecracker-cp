@@ -6,13 +6,11 @@ import (
 	"firecracker-cp/image"
 	"fmt"
 	"io/fs"
-	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"os"
 	"path"
 	"strconv"
-	"time"
 
 	"github.com/firecracker-microvm/firecracker-go-sdk"
 	fc "github.com/firecracker-microvm/firecracker-go-sdk"
@@ -26,7 +24,16 @@ import (
 
 const socketRootDir = "/tmp/firecracker"
 
+var uVMs = make(map[string]VM)
+
+type VM struct {
+	ID      string
+	IPAddr  string
+	machine *fc.Machine
+}
+
 type CreateVMResponse struct {
+	ID        string `json:"id"`
 	IPAddress string `json:"ipAddress"`
 }
 
@@ -34,12 +41,16 @@ type CreateVMRequest struct {
 	SSHPubKey string `json:"sshPubKey"`
 }
 
+type ErrorResponse struct {
+	Error string `json:"error"`
+}
+
 func (a *CreateVMRequest) Bind(r *http.Request) error {
 	return nil
 }
 
 func deleteDirContents(dirName string) error {
-	files, err := ioutil.ReadDir(dirName)
+	files, err := os.ReadDir(dirName)
 	if err != nil {
 		return err
 	}
@@ -76,6 +87,7 @@ func main() {
 	r.Use(middleware.Logger)
 	r.Use(render.SetContentType(render.ContentTypeJSON))
 	r.Post("/vm", handleCreateVM)
+	r.Delete("/vm/{id}", handleDeleteVM)
 
 	// Start API server
 	const port = 3000
@@ -98,14 +110,39 @@ func handleCreateVM(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Debug().Msgf("SSH pubkey is at %s", sshKeyImage)
 
-	ipAddr := createVM(socketRootDir, sshKeyImage)
-	log.Debug().Msgf("IPaddr=%s", ipAddr)
-	render.JSON(w, r, CreateVMResponse{IPAddress: ipAddr})
+	vm := createVM(socketRootDir, sshKeyImage)
+	uVMs[vm.ID] = vm
+	log.Debug().Msgf("ID=%s IPaddr=%s", vm.ID, vm.IPAddr)
+	render.JSON(w, r, CreateVMResponse{ID: vm.ID, IPAddress: vm.ID})
 }
 
-func createVM(socketDir string, sshKeyImage string) string {
+func handleDeleteVM(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vmID := chi.URLParam(r, "id")
+	if vmID == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	vm, ok := uVMs[vmID]
+	if !ok {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	err := vm.machine.Shutdown(ctx)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		render.JSON(w, r,
+			ErrorResponse{
+				Error: fmt.Errorf("unable to shutdown vm err=%w", err).Error(),
+			})
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func createVM(socketDir string, sshKeyImage string) VM {
 	// Create a unique ID
-	rand.Seed(time.Now().Unix())
 	id := strconv.Itoa(rand.Intn(10000000))
 	sockName := id + ".sock"
 	log.Debug().Msgf("Creating uVM and using %s as API socket", sockName)
@@ -174,6 +211,10 @@ func createVM(socketDir string, sshKeyImage string) string {
 	}
 
 	// Get allocated IP address from CNI
-	ipBuf, err := ioutil.ReadFile("/var/lib/cni/networks/fcnet/last_reserved_ip.0")
-	return string(ipBuf)
+	ipBuf, _ := os.ReadFile("/var/lib/cni/networks/fcnet/last_reserved_ip.0")
+	return VM{
+		ID:      id,
+		IPAddr:  string(ipBuf),
+		machine: uVM,
+	}
 }

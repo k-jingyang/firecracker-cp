@@ -3,8 +3,10 @@ module firecracker-cp
 go 1.18
 
 require (
+	github.com/diskfs/go-diskfs v1.3.0
 	github.com/firecracker-microvm/firecracker-go-sdk v1.0.0
 	github.com/go-chi/chi v1.5.4
+	github.com/go-chi/render v1.0.2
 	github.com/rs/zerolog v1.28.0
 	github.com/samber/lo v1.37.0
 	pault.ag/go/loopback v0.1.4
@@ -18,8 +20,6 @@ require (
 	github.com/containerd/fifo v1.0.0 // indirect
 	github.com/containernetworking/cni v1.0.1 // indirect
 	github.com/containernetworking/plugins v1.0.1 // indirect
-	github.com/diskfs/go-diskfs v1.3.0 // indirect
-	github.com/go-chi/render v1.0.2 // indirect
 	github.com/go-openapi/analysis v0.21.2 // indirect
 	github.com/go-openapi/errors v0.20.2 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
