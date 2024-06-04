@@ -1,0 +1,1 @@
+docker build . -t docker.io/kjingyang/ubuntu:22.04

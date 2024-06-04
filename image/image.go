@@ -8,8 +8,11 @@ import (
 	"io/fs"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
+	"strings"
 
+	"github.com/ForAllSecure/rootfs_builder/rootfs"
 	"github.com/diskfs/go-diskfs"
 	"github.com/rs/zerolog/log"
 	"pault.ag/go/loopback"
@@ -19,53 +22,23 @@ import (
 BuildSquashFSImage builds the necessary rootfs image for the uVM
 
 The logic, based off https://github.com/firecracker-microvm/firecracker/discussions/3061
-1. Mount base image
-2. Create directories in image to be used for overlay (https://windsock.io/the-overlay-filesystem/)
-  i. 	/overlay/work - scratch space
-  ii. 	/overlay/root - upperdir that provides the writeable layer
-  iii.	/mnt - the new root
-  iv. 	/mnt/rom - the old root
-3. Copy overlay_init into /sbin/overlay-init
-3. Make squashfs
+ 1. Mount base image
+ 2. Create directories in image to be used for overlay (https://windsock.io/the-overlay-filesystem/)
+    i. 	/overlay/work - scratch space
+    ii. 	/overlay/root - upperdir that provides the writeable layer
+    iii.	/mnt - the new root
+    iv. 	/mnt/rom - the old root
+ 3. Copy overlay_init into /sbin/overlay-init
+ 3. Make squashfs
 */
 func BuildSquashFSImage(pathToBaseImage string, pathToInitScript string, pathToNewSquashImage string) error {
 	mountDir, cleanUp, err := mountImageToRandomDir(pathToBaseImage)
 	if err != nil {
 		return err
-
 	}
 	defer cleanUp()
 
-	// Create directories that will be used later for overlay
-	os.MkdirAll(filepath.Join(mountDir, "overlay", "work"), 0755)
-	os.MkdirAll(filepath.Join(mountDir, "overlay", "root"), 0755)
-	os.MkdirAll(filepath.Join(mountDir, "mnt"), 0755)
-	os.MkdirAll(filepath.Join(mountDir, "rom"), 0755)
-
-	dirEntries, err := os.ReadDir(filepath.Join(mountDir))
-	if err != nil {
-		log.Error().Msg("Unable to read directory entries")
-		return err
-	}
-
-	for _, entry := range dirEntries {
-		fmt.Println(entry.Name())
-	}
-
-	// Copy overlay_init
-	destination, err := os.Create(filepath.Join(mountDir, "sbin", "overlay-init"))
-	if err != nil {
-		return err
-	}
-	os.Chmod(destination.Name(), os.FileMode(0755))
-	defer destination.Close()
-
-	overlay_init, err := os.ReadFile(filepath.Join(".", pathToInitScript))
-	if err != nil {
-		return err
-
-	}
-	_, err = destination.Write(overlay_init)
+	err = addRequiredFiles(mountDir, pathToInitScript)
 	if err != nil {
 		return err
 	}
@@ -77,21 +50,9 @@ func BuildSquashFSImage(pathToBaseImage string, pathToInitScript string, pathToN
 		return err
 	}
 
-	// List directories
-	dirEntries, err = os.ReadDir(filepath.Join(mountDir, "sbin"))
-
-	if err != nil {
-		log.Error().Msg("Unable to read directory entries")
-		return err
-
-	}
-
-	for _, entry := range dirEntries {
-		fmt.Println(entry.Name())
-	}
+	printDir(mountDir)
 
 	return nil
-
 }
 
 // mountImageToRandomDir mounts the image to a random directory and returns the mountpoint
@@ -126,6 +87,54 @@ func mountImageToRandomDir(imagePath string) (string, func(), error) {
 	}
 
 	return randomDirName, cleanUp, nil
+}
+
+func printDir(dirName string) error {
+	// List directories
+	dirEntries, err := os.ReadDir(filepath.Join(dirName, "sbin"))
+	if err != nil {
+		log.Error().Err(err).Msg("Unable to read directory entries")
+		return err
+	}
+
+	for _, entry := range dirEntries {
+		fmt.Println(entry.Name())
+	}
+
+	return nil
+}
+
+func addRequiredFiles(mountDir string, pathToInitScript string) error {
+	os.MkdirAll(filepath.Join(mountDir, "overlay", "work"), 0754)
+	os.MkdirAll(filepath.Join(mountDir, "overlay", "root"), 0754)
+	os.MkdirAll(filepath.Join(mountDir, "mnt"), 0754)
+	os.MkdirAll(filepath.Join(mountDir, "rom"), 0754)
+
+	// Copy overlay_init
+	destination, err := os.Create(filepath.Join(mountDir, "sbin", "overlay-init"))
+	if err != nil {
+		return fmt.Errorf("unable to create overlay-init: %w", err)
+	}
+	os.Chmod(destination.Name(), os.FileMode(0754))
+	defer destination.Close()
+
+	overlay_init, err := os.ReadFile(filepath.Join(".", pathToInitScript))
+	if err != nil {
+		return fmt.Errorf("unable to read overlay-init: %w", err)
+
+	}
+	_, err = destination.Write(overlay_init)
+	if err != nil {
+		return fmt.Errorf("unable to write overlay-init: %w", err)
+	}
+
+	// Configure nameserver
+	err = os.WriteFile(filepath.Join(mountDir, "etc", "resolv.conf"), []byte("nameserver 8.8.8.8\n"), 0644)
+	if err != nil {
+		return fmt.Errorf("unable to write /etc/resolv.conf: %w", err)
+	}
+
+	return nil
 }
 
 // Make SSH image from SSH key
@@ -176,4 +185,64 @@ func MakeSSHDiskImage(sshPubKey []byte) (string, error) {
 	}
 
 	return disk.File.Name(), nil
+}
+
+func MakeRootFS(dockerImage string, pathToInitScript string) (string, error) {
+	blobFile := strings.ReplaceAll(dockerImage, ":", "-")
+	blobFile = strings.ReplaceAll(blobFile, "/", "-")
+
+	blobFSPath := path.Join("blobs", blobFile)
+	// file alr exists, don't have to repeat
+	if _, err := os.Stat(blobFSPath); err == nil {
+		return blobFSPath, nil
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return "", fmt.Errorf("unable to stat %s: %w", blobFSPath, err)
+	}
+
+	// file does not exist, so we should build make the rootfs img
+	randomDir, err := os.MkdirTemp("/tmp", "*")
+	if err != nil {
+		return "", fmt.Errorf("unable to create random folder: %w", err)
+	}
+
+	log.Debug().Msgf("created random folder for docker container fs: %s", randomDir)
+
+	// defer os.RemoveAll(randomDir)
+
+	imageToPull := rootfs.PullableImage{
+		Name:    dockerImage,
+		Retries: 3,
+		Spec: rootfs.Spec{
+			Dest: randomDir,
+		},
+	}
+
+	// TODO: Need to inject init
+	pulled, err := imageToPull.Pull()
+	if err != nil {
+		return "", fmt.Errorf("unable to pull image %s: %w", dockerImage, err)
+	}
+
+	err = pulled.Extract()
+	extractedRootFS := path.Join(randomDir, "rootfs")
+	if err != nil {
+		return "", fmt.Errorf("unable to extract image %s: %w", dockerImage, err)
+	}
+
+	err = addRequiredFiles(extractedRootFS, pathToInitScript)
+	if err != nil {
+		return "", fmt.Errorf("unable to add required files: %w", err)
+	}
+
+	// TODO Use zstd?
+	log.Debug().Msgf("running mksquashfs on %s, outputting to %s", extractedRootFS, blobFSPath)
+	mksquashfs := exec.Command("mksquashfs", extractedRootFS, blobFSPath, "-noappend")
+	err = mksquashfs.Run()
+	if err != nil {
+		return "", fmt.Errorf("unable to run mksquashfs: %w", err)
+	}
+
+	printDir(randomDir)
+
+	return blobFSPath, nil
 }

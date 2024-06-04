@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"firecracker-cp/image"
 	"fmt"
 	"io/fs"
@@ -38,7 +37,8 @@ type CreateVMResponse struct {
 }
 
 type CreateVMRequest struct {
-	SSHPubKey string `json:"sshPubKey"`
+	SSHPubKey   string `json:"sshPubKey"`
+	DockerImage string `json:"dockerImage"`
 }
 
 type ErrorResponse struct {
@@ -66,17 +66,17 @@ func deleteDirContents(dirName string) error {
 
 func main() {
 	// Make squashFS rootfs image
-	const squashFsImage = "./squash-rootfs.img"
-	_, err := os.Stat(squashFsImage)
-	if errors.Is(err, fs.ErrNotExist) {
-		log.Debug().Msg(squashFsImage + "does not exist. Creating...")
+	// const squashFsImage = "./squash-rootfs.img"
+	// _, err := os.Stat(squashFsImage)
+	// if errors.Is(err, fs.ErrNotExist) {
+	// 	log.Debug().Msg(squashFsImage + "does not exist. Creating...")
 
-		err = image.BuildSquashFSImage("./bionic.rootfs.base.ext4", "./overlay-init", squashFsImage)
+	// 	err = image.BuildSquashFSImage("./ubuntu-22.04-squashfs", "./overlay-init", squashFsImage)
 
-		if err != nil {
-			log.Panic().Err(err).Msgf("Unable to create %s image. Exiting", squashFsImage)
-		}
-	}
+	// 	if err != nil {
+	// 		log.Panic().Err(err).Msgf("Unable to create %s image. Exiting", squashFsImage)
+	// 	}
+	// }
 
 	// Setup directory to store socket files and clean up after
 	os.MkdirAll(socketRootDir, fs.ModePerm)
@@ -92,7 +92,7 @@ func main() {
 	// Start API server
 	const port = 3000
 	log.Info().Msgf("Starting API server at %d", port)
-	err = http.ListenAndServe(fmt.Sprintf(":%d", port), r)
+	err := http.ListenAndServe(fmt.Sprintf(":%d", port), r)
 
 	if err != nil {
 		log.Error().Msg(err.Error())
@@ -103,14 +103,25 @@ func handleCreateVM(w http.ResponseWriter, r *http.Request) {
 	data := &CreateVMRequest{}
 	render.Bind(r, data)
 	sshPubKey := []byte(data.SSHPubKey)
+
 	// Make SSH key image
 	sshKeyImage, err := image.MakeSSHDiskImage(sshPubKey)
 	if err != nil {
-		log.Panic().Err(err).Send()
+		log.Err(err).Send()
+		render.JSON(w, r, ErrorResponse{Error: err.Error()})
 	}
 	log.Debug().Msgf("SSH pubkey is at %s", sshKeyImage)
 
-	vm := createVM(socketRootDir, sshKeyImage)
+	// Build rootfs image from docker image name
+	rootFSImg, err := image.MakeRootFS(data.DockerImage, "./overlay-init")
+	if err != nil {
+		log.Err(err).Send()
+		render.JSON(w, r, ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	// Create VM
+	vm := createVM(socketRootDir, rootFSImg, sshKeyImage)
 	uVMs[vm.ID] = vm
 	log.Debug().Msgf("ID=%s IPaddr=%s", vm.ID, vm.IPAddr)
 	render.JSON(w, r, CreateVMResponse{ID: vm.ID, IPAddress: vm.IPAddr})
@@ -141,12 +152,11 @@ func handleDeleteVM(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func createVM(socketDir string, sshKeyImage string) VM {
+func createVM(socketDir string, pathToRootFS string, sshKeyImage string) VM {
 	// Create a unique ID
 	id := strconv.Itoa(rand.Intn(10000000))
 	sockName := id + ".sock"
-	log.Debug().Msgf("Creating uVM and using %s as API socket", sockName)
-
+	log.Debug().Msgf("Creating uVM, ID=%s, socket=%s pathToRootFS=%s, sshKeyImage=%s", id, sockName, pathToRootFS, sshKeyImage)
 	// Create logs files
 	// TODO Is there a better way to create logs inside logs/ other than pre-creating /logs
 	stdout, _ := os.Create("logs/" + id + "-out.log")
@@ -159,12 +169,12 @@ func createVM(socketDir string, sshKeyImage string) VM {
 		SocketPath:      path.Join(socketDir, sockName),
 		LogPath:         stdout.Name(),
 		LogLevel:        "Info",
-		KernelImagePath: "vmlinux.bin",
+		KernelImagePath: "vmlinux-5.10.217",
 		KernelArgs:      "console=ttyS0 reboot=k panic=1 pci=off overlay_root=ram ssh_disk=/dev/vdb init=/sbin/overlay-init",
 		Drives: []models.Drive{
 			{
 				DriveID:      lo.ToPtr("rootfs"),
-				PathOnHost:   lo.ToPtr("squash-rootfs.img"),
+				PathOnHost:   lo.ToPtr(pathToRootFS),
 				IsRootDevice: lo.ToPtr(true),
 				IsReadOnly:   lo.ToPtr(true),
 				CacheType:    lo.ToPtr("Unsafe"),
