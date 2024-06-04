@@ -113,7 +113,7 @@ func handleCreateVM(w http.ResponseWriter, r *http.Request) {
 	vm := createVM(socketRootDir, sshKeyImage)
 	uVMs[vm.ID] = vm
 	log.Debug().Msgf("ID=%s IPaddr=%s", vm.ID, vm.IPAddr)
-	render.JSON(w, r, CreateVMResponse{ID: vm.ID, IPAddress: vm.ID})
+	render.JSON(w, r, CreateVMResponse{ID: vm.ID, IPAddress: vm.IPAddr})
 }
 
 func handleDeleteVM(w http.ResponseWriter, r *http.Request) {
