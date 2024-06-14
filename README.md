@@ -71,6 +71,8 @@ Control plane for spinning up Firecracker microVMs
 12. When you use mkfs.ext4 on a file too small (2MB), it gives that error that says that `Filesystem too small for a journal` and creates an ext2 instead.
 13. Ballooning 
     1.  Allows the hypervisor to get memory from provisioned guest VMs
+14. DNS nameserver settings will only be effective if the VM's rootfs makes /etc/resolv.conf be a symlink to /proc/net/pnp.
+
 
 ## On CNI
 1. CNI is responsible for inserting an interface into a network namespace and configures the interface (e.g. assigning an IP address)
@@ -79,6 +81,7 @@ Control plane for spinning up Firecracker microVMs
 3. CNI plugins are meant to be chained.
    - In the example provided by in [firecracker-go-sdk](https://github.com/firecracker-microvm/firecracker-go-sdk#), `ptp`, `host-local`, `firewall`, and `tc-redirect-tap` are used
 4. `/etc/cni/conf.d/*.conflist` is a convention for CNI configs
+
 
 ## To run
 1. `go build && sudo ./firecracker-cp`
@@ -89,5 +92,3 @@ curl -X POST localhost:3000/vm -d @-  << EOF
    "sshPubKey" : "xxx"
 }
 EOF
-```
-
