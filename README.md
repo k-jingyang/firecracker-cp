@@ -18,10 +18,11 @@ Control plane for spinning up Firecracker microVMs
 3. Start API server
 
 ## References
+
 1. How to have a new rootfs for each instance, without copying rootfs
    1. Copy-on-write using overlayfs - https://github.com/firecracker-microvm/firecracker/discussions/3061
-       -  Do we really need to use SquashFS? 
-           -  Yes, as it is a read-only compressed (300MB to 58MB) image
+       - Do we really need to use SquashFS? 
+           - Yes, as it is a read-only compressed (300MB to 58MB) image
 2. Specify SSH pub key to put inside the microV
    1. May consider sending SSH pub key into MMDS and have the microVM fetch the SSH pub key
       1. microVM has to be configured to fetch from MMDS on boot, https://github.com/firecracker-microvm/firecracker/issues/1947
@@ -69,9 +70,20 @@ Control plane for spinning up Firecracker microVMs
 11. Why is it right to create the `/rom` folder while the `pivot_root` is `/mnt/rom`
     1. Because the `old_root` must be a path under `new_root` (e.g. if given `/mnt/rom`, when `/mnt` becomes the new root, old_root will be placed under `/rom` of the new `/mnt` root
 12. When you use mkfs.ext4 on a file too small (2MB), it gives that error that says that `Filesystem too small for a journal` and creates an ext2 instead.
-13. Ballooning 
-    1.  Allows the hypervisor to get memory from provisioned guest VMs
+13. Ballooning
+    1. Allows the hypervisor to get memory from provisioned guest VMs
 14. DNS nameserver settings will only be effective if the VM's rootfs makes /etc/resolv.conf be a symlink to /proc/net/pnp.
+15. nftables not enabled in kernel, need to enable when compiling kernel via `.config`
+    1. don't understand what each config does, and why my `.config` was invalid, causing it to be overwritten each time I run `make vmlinux`
+         - My `.config` was most probably wrong because some configurations depend on other configurations and I didn't enable the right dependencies
+    2. https://stackoverflow.com/questions/22929065/difference-between-linux-loadable-and-built-in-modules explains the difference between `y` and `m` in `.config`
+16. rootfs needs to have an init (most docker images do not have it)
+17. nftables errors were due to NF/XTABLE not enabled in the compiled kernel (vmlinux). See point 15.
+
+```text
+iptables v1.8.7 (nf_tables): Could not fetch rule set generation id: Invalid argument
+iptables v1.8.7 (nf_tables):  TABLE_ADD failed (Operation not supported): table filter
+```
 
 
 ## On CNI
@@ -80,7 +92,7 @@ Control plane for spinning up Firecracker microVMs
    - Should verify what happens if we don't create it. But seems like we have to create it.
 3. CNI plugins are meant to be chained.
    - In the example provided by in [firecracker-go-sdk](https://github.com/firecracker-microvm/firecracker-go-sdk#), `ptp`, `host-local`, `firewall`, and `tc-redirect-tap` are used
-4. `/etc/cni/conf.d/*.conflist` is a convention for CNI configs
+4. Firecracker searches for CNI configuration under `/etc/cni/conf.d/`
 
 
 ## To run
