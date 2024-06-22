@@ -128,6 +128,7 @@ func addRequiredFiles(mountDir string, pathToInitScript string) error {
 		return fmt.Errorf("unable to write overlay-init: %w", err)
 	}
 
+	// Maybe can be done by CNI?
 	// Configure nameserver
 	err = os.WriteFile(filepath.Join(mountDir, "etc", "resolv.conf"), []byte("nameserver 8.8.8.8\n"), 0644)
 	if err != nil {
@@ -208,27 +209,27 @@ func MakeRootFS(dockerImage string, pathToInitScript string) (string, error) {
 	log.Debug().Msgf("created random folder for docker container fs: %s", randomDir)
 
 	// defer os.RemoveAll(randomDir)
-
+	certsPath := "/etc/ssl/certs/ca-certificates.crt"
 	imageToPull := rootfs.PullableImage{
 		Name:    dockerImage,
 		Retries: 3,
 		Spec: rootfs.Spec{
 			Dest: randomDir,
 		},
+		Cert: &certsPath,
 	}
 
-	// TODO: Need to inject init
 	pulled, err := imageToPull.Pull()
 	if err != nil {
 		return "", fmt.Errorf("unable to pull image %s: %w", dockerImage, err)
 	}
 
 	err = pulled.Extract()
-	extractedRootFS := path.Join(randomDir, "rootfs")
 	if err != nil {
 		return "", fmt.Errorf("unable to extract image %s: %w", dockerImage, err)
 	}
 
+	extractedRootFS := path.Join(randomDir, "rootfs")
 	err = addRequiredFiles(extractedRootFS, pathToInitScript)
 	if err != nil {
 		return "", fmt.Errorf("unable to add required files: %w", err)

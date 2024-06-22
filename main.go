@@ -11,7 +11,6 @@ import (
 	"path"
 	"strconv"
 
-	"github.com/firecracker-microvm/firecracker-go-sdk"
 	fc "github.com/firecracker-microvm/firecracker-go-sdk"
 	"github.com/firecracker-microvm/firecracker-go-sdk/client/models"
 	"github.com/go-chi/chi"
@@ -88,6 +87,7 @@ func main() {
 	r.Use(render.SetContentType(render.ContentTypeJSON))
 	r.Post("/vm", handleCreateVM)
 	r.Delete("/vm/{id}", handleDeleteVM)
+	r.Mount("/debug", middleware.Profiler())
 
 	// Start API server
 	const port = 3000
@@ -114,6 +114,8 @@ func handleCreateVM(w http.ResponseWriter, r *http.Request) {
 
 	// Build rootfs image from docker image name
 	rootFSImg, err := image.MakeRootFS(data.DockerImage, "./overlay-init")
+	// err = image.BuildSquashFSImage("blobs/amazon-ubuntu-22.04", "./overlay-init", "./amz-squashfs.img")
+	// rootFSImg := "./amz-squashfs.img"
 	if err != nil {
 		log.Err(err).Send()
 		render.JSON(w, r, ErrorResponse{Error: err.Error()})
@@ -169,7 +171,7 @@ func createVM(socketDir string, pathToRootFS string, sshKeyImage string) VM {
 		SocketPath:      path.Join(socketDir, sockName),
 		LogPath:         stdout.Name(),
 		LogLevel:        "Info",
-		KernelImagePath: "vmlinux-5.10.217",
+		KernelImagePath: "vmlinux-6.1",
 		KernelArgs:      "console=ttyS0 reboot=k panic=1 pci=off overlay_root=ram ssh_disk=/dev/vdb init=/sbin/overlay-init",
 		Drives: []models.Drive{
 			{
@@ -199,7 +201,7 @@ func createVM(socketDir string, pathToRootFS string, sshKeyImage string) VM {
 
 		NetworkInterfaces: fc.NetworkInterfaces{
 			fc.NetworkInterface{
-				CNIConfiguration: &firecracker.CNIConfiguration{
+				CNIConfiguration: &fc.CNIConfiguration{
 					NetworkName: "fcnet",
 					IfName:      "veth0",
 				},
@@ -214,7 +216,7 @@ func createVM(socketDir string, pathToRootFS string, sshKeyImage string) VM {
 		log.Error().Msg(err.Error())
 	}
 
-	uVM.Start(context.Background())
+	err = uVM.Start(context.Background())
 
 	if err != nil {
 		log.Error().Msg(err.Error())
